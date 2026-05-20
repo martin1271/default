@@ -152,12 +152,20 @@ function traces(cd){
   return R;
 }
 
-function layout(price){
+function layout(price, times){
+  // Pin x-axis to current session: first bar → last bar + small right gap
+  const t0  = new Date(times[0]);
+  const t1  = new Date(times[times.length - 1]);
+  const gap = 4 * 5 * 60 * 1000;   // 4 bars of right padding so price tag is visible
   return {
     paper_bgcolor:BG,plot_bgcolor:BG,
     font:{color:'#d1d4dc',size:11},
     margin:{l:0,r:66,t:4,b:4},
-    xaxis:{rangeslider:{visible:false},gridcolor:GRID,linecolor:AX,tickcolor:AX,type:'date'},
+    xaxis:{
+      rangeslider:{visible:false},gridcolor:GRID,linecolor:AX,tickcolor:AX,
+      type:'date',
+      range:[t0, new Date(t1.getTime() + gap)],
+    },
     yaxis:{domain:[.24,1],gridcolor:GRID,linecolor:AX,tickcolor:AX,side:'right',autorange:true},
     yaxis2:{domain:[0,.21],gridcolor:GRID,linecolor:AX,zeroline:true,zerolinecolor:'#434651',zerolinewidth:1,side:'right'},
     shapes:[{type:'line',xref:'paper',x0:0,x1:1,yref:'y',y0:price,y1:price,
@@ -174,7 +182,7 @@ const CFG = {displayModeBar:false,scrollZoom:true,responsive:true};
 
 function showCard(card){
   const tr = traces(card.chart);
-  const ly = layout(card.current_price);
+  const ly = layout(card.current_price, card.chart.times);
   if(!ready){ Plotly.newPlot('chart',tr,ly,CFG); ready=true; }
   else       { Plotly.react('chart',tr,ly,CFG); }
   const d = new Date(card.timestamp);
@@ -183,20 +191,24 @@ function showCard(card){
 }
 
 function revealFuture(fc, direction){
-  const ft = fc.times.map(s=>new Date(s));
-  const fc2 = fc.future_candles || fc;
-  const fill = direction==='BUY' ? 'rgba(38,166,154,.08)' : 'rgba(239,83,80,.08)';
+  const ft  = fc.times.map(s=>new Date(s));
+  const fill = direction==='BUY' ? 'rgba(38,166,154,.10)' : 'rgba(239,83,80,.10)';
+  // Extend x-axis to show future candles + small right padding
+  const padMs = 5 * 60 * 1000;  // 5-min padding
   Plotly.relayout('chart',{
-    'shapes[1]':{type:'rect',xref:'x',yref:'paper',x0:ft[0],x1:ft[ft.length-1],y0:.24,y1:1,fillcolor:fill,line:{width:0}},
-    'shapes[2]':{type:'line',xref:'x',yref:'paper',x0:ft[0],x1:ft[0],y0:0,y1:1,line:{color:'#787b86',width:1,dash:'dot'}}
+    'xaxis.range[1]': new Date(ft[ft.length-1].getTime() + padMs),
+    'shapes[1]':{type:'rect',xref:'x',yref:'paper',
+      x0:ft[0],x1:ft[ft.length-1],y0:.24,y1:1,fillcolor:fill,line:{width:0}},
+    'shapes[2]':{type:'line',xref:'x',yref:'paper',
+      x0:ft[0],x1:ft[0],y0:0,y1:1,line:{color:'#787b86',width:1,dash:'dot'}}
   });
   Plotly.addTraces('chart',[{
-    type:'candlestick',x:ft,open:fc2.open||fc.open,high:fc2.high||fc.high,
-    low:fc2.low||fc.low,close:fc2.close||fc.close,
+    type:'candlestick',x:ft,
+    open:fc.open, high:fc.high, low:fc.low, close:fc.close,
     name:'30分鐘後',yaxis:'y',
-    increasing:{line:{color:'rgba(38,166,154,.9)'},fillcolor:'rgba(38,166,154,.55)'},
-    decreasing:{line:{color:'rgba(239,83,80,.9)'},fillcolor:'rgba(239,83,80,.55)'},
-    hovertemplate:'[未來] C:%{close:.1f}<extra></extra>'
+    increasing:{line:{color:'#26a69a'},fillcolor:'rgba(38,166,154,.7)'},
+    decreasing:{line:{color:'#ef5350'},fillcolor:'rgba(239,83,80,.7)'},
+    hovertemplate:'[未來] O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'
   }]);
 }
 

@@ -25,8 +25,16 @@ def precompute_all(df):
     print("  Done.")
     return dict(emas=emas, bb_u=bb_u, bb_m=bb_m, bb_l=bb_l, mom=mom, sqz_on=sqz_on)
 
+def session_start(df, end_idx):
+    """Return the index of the first bar of the current trading day."""
+    cur_date = df.index[end_idx - 1].date()
+    for i in range(end_idx - 1, max(0, end_idx - 90), -1):
+        if df.index[i].date() != cur_date:
+            return i + 1
+    return max(0, end_idx - 78)
+
 def build_card(df, end_idx, ind):
-    start_idx = max(0, end_idx - LOOKBACK)
+    start_idx = session_start(df, end_idx)   # start of today's session
     idx_range = range(start_idx, end_idx)
 
     times  = [df.index[i].isoformat() for i in idx_range]
@@ -66,8 +74,10 @@ def build_card(df, end_idx, ind):
         future_price  = future_price,
         future_candles= dict(
             times=[df.index[i].isoformat() for i in future_range],
-            **{k: [round(float(df[k].iloc[i]),2) for i in future_range]
-               for k in ['Open','High','Low','Close']}
+            open =[round(float(df['Open'].iloc[i]),  2) for i in future_range],
+            high =[round(float(df['High'].iloc[i]),  2) for i in future_range],
+            low  =[round(float(df['Low'].iloc[i]),   2) for i in future_range],
+            close=[round(float(df['Close'].iloc[i]), 2) for i in future_range],
         )
     )
 
