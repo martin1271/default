@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAS100 交易學習卡</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --bull: #26a69a;
+    --bear: #ef5350;
+    --wick: #aaa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo { font-size: 1.1rem; font-weight: 700; color: var(--blue); }
+  .logo span { color: var(--muted); font-weight: 400; font-size: 0.85rem; margin-left: 8px; }
+
+  .score-bar {
+    display: flex; gap: 20px; font-size: 0.85rem;
+  }
+  .score-item { display: flex; flex-direction: column; align-items: center; }
+  .score-item .val { font-size: 1.2rem; font-weight: 700; }
+  .score-item.c .val { color: var(--green); }
+  .score-item.w .val { color: var(--red); }
+  .score-item.a .val { color: var(--blue); }
+  .score-item .lbl { color: var(--muted); font-size: 0.7rem; }
+
+  main {
+    width: 100%;
+    max-width: 960px;
+    padding: 20px 16px;
+    flex: 1;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .card-meta .badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+  }
+
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+  }
+  .chart-title {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .entry-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  canvas#mainChart {
+    width: 100% !important;
+    height: 320px !important;
+  }
+
+  .question-box {
+    margin-top: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+  }
+  .question-box h3 {
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .question-box p {
+    font-size: 0.83rem;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 12px 32px;
+    border-radius: 6px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    letter-spacing: .5px;
+  }
+  .btn:hover { opacity: .85; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.buy  { background: var(--green); color: #0d1117; }
+  .btn.sell { background: var(--red);   color: #fff; }
+  .btn.hold { background: var(--yellow); color: #0d1117; }
+  .btn.next { background: var(--blue);  color: #0d1117; }
+  .btn.skip { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+
+  /* Result overlay */
+  .result-box {
+    display: none;
+    margin-top: 20px;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    border: 2px solid;
+  }
+  .result-box.correct { border-color: var(--green); background: rgba(63,185,80,.08); }
+  .result-box.wrong   { border-color: var(--red);   background: rgba(248,81,73,.08); }
+  .result-box h2 { font-size: 1.4rem; margin-bottom: 8px; }
+  .result-box.correct h2 { color: var(--green); }
+  .result-box.wrong   h2 { color: var(--red); }
+  .result-stats {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin: 12px 0 18px;
+    font-size: 0.9rem;
+  }
+  .result-stats .stat { display: flex; flex-direction: column; align-items: center; }
+  .result-stats .stat .v { font-size: 1.1rem; font-weight: 700; }
+  .result-stats .stat .l { color: var(--muted); font-size: 0.72rem; }
+  .future-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    justify-content: flex-end;
+  }
+  .mode-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .mode-btn.active {
+    background: var(--blue);
+    color: var(--bg);
+    border-color: var(--blue);
+    font-weight: 700;
+  }
+
+  .keyboard-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  kbd {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.72rem;
+  }
+
+  /* Reset button */
+  #resetBtn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+  #resetBtn:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NAS100 學習卡 <span id="periodLabel"></span></div>
+  <div class="score-bar">
+    <div class="score-item c"><div class="val" id="sCorrect">0</div><div class="lbl">答對</div></div>
+    <div class="score-item w"><div class="val" id="sWrong">0</div><div class="lbl">答錯</div></div>
+    <div class="score-item a"><div class="val" id="sAccuracy">—</div><div class="lbl">正確率</div></div>
+    <button id="resetBtn">重置</button>
+  </div>
+</header>
+
+<main>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeRandom" onclick="setMode('random')">隨機</button>
+    <button class="mode-btn" id="modeSeq" onclick="setMode('sequential')">依序</button>
+  </div>
+
+  <div class="card-meta">
+    <span id="cardDate">—</span>
+    <span class="badge" id="cardBadge">—</span>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">
+      <span>NAS100 5分鐘圖 — 最近 5 小時（60 根 K 棒）</span>
+      <span class="entry-price" id="entryLabel">—</span>
+    </div>
+    <div class="loading" id="loading">載入中 …</div>
+    <canvas id="mainChart" style="display:none"></canvas>
+  </div>
+
+  <div class="question-box" id="questionBox">
+    <h3>下一根 K 棒開盤後 30 分鐘，你的操作？</h3>
+    <p>根據圖表走勢、成交量及動能，選擇你的買賣方向</p>
+    <div class="btn-row">
+      <button class="btn buy"  onclick="submitAnswer('BUY')">做多 BUY</button>
+      <button class="btn sell" onclick="submitAnswer('SELL')">做空 SELL</button>
+      <button class="btn hold" onclick="submitAnswer('HOLD')">觀望 HOLD</button>
+      <button class="btn skip" onclick="nextCard()">跳過</button>
+    </div>
+    <div class="keyboard-hint">
+      快捷鍵：<kbd>B</kbd> 買入 &nbsp; <kbd>S</kbd> 賣出 &nbsp; <kbd>H</kbd> 觀望 &nbsp; <kbd>N / Space</kbd> 下一題
+    </div>
+  </div>
+
+  <div class="result-box" id="resultBox">
+    <h2 id="resultTitle"></h2>
+    <div class="result-stats">
+      <div class="stat"><div class="v" id="rNet"></div><div class="l">30分淨收益</div></div>
+      <div class="v" style="color:var(--muted);align-self:center">|</div>
+      <div class="stat"><div class="v" id="rUp"></div><div class="l">最高漲幅</div></div>
+      <div class="v" style="color:var(--muted);align-self:center">|</div>
+      <div class="stat"><div class="v" id="rDown"></div><div class="l">最大回撤</div></div>
+    </div>
+    <div class="future-label" id="futureLabel"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn next" onclick="nextCard()">下一題 →</button>
+    </div>
+    <div class="keyboard-hint" style="margin-top:10px">
+      <kbd>N</kbd> 或 <kbd>Space</kbd> 繼續
+    </div>
+  </div>
+</main>
+
+<script>
+// ── Minimal candlestick chart renderer (no external deps) ──────────────
+const BULL = '#26a69a', BEAR = '#ef5350', WICK = '#888';
+const VOL_BULL = 'rgba(38,166,154,.5)', VOL_BEAR = 'rgba(239,83,80,.5)';
+
+function drawChart(canvas, candles, futureBars) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const allBars = futureBars ? [...candles, ...futureBars] : candles;
+  const volPanelH = 55;
+  const chartH = H - volPanelH - 8;
+
+  const highs = allBars.map(b => b.h), lows = allBars.map(b => b.l);
+  const priceMax = Math.max(...highs) * 1.001;
+  const priceMin = Math.min(...lows)  * 0.999;
+  const volMax = Math.max(...allBars.map(b => b.v)) * 1.05;
+  const n = allBars.length;
+
+  const pad = { l: 8, r: 58, t: 8, b: 4 };
+  const chartW = W - pad.l - pad.r;
+
+  function px(i) { return pad.l + (i + 0.5) * chartW / n; }
+  function py(price) {
+    return pad.t + (1 - (price - priceMin) / (priceMax - priceMin)) * chartH;
+  }
+  function vy(vol) {
+    return H - volPanelH - 8 + (1 - vol / volMax) * (volPanelH - 4);
+  }
+
+  // Background
+  ctx.fillStyle = '#161b22'; ctx.fillRect(0, 0, W, H);
+
+  // Separator line
+  ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H - volPanelH - 8); ctx.lineTo(W, H - volPanelH - 8); ctx.stroke();
+
+  // Grid lines (price)
+  const steps = 5;
+  ctx.strokeStyle = 'rgba(48,54,61,.6)'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= steps; i++) {
+    const price = priceMin + (priceMax - priceMin) * (i / steps);
+    const y = py(price);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    ctx.fillStyle = '#7d8590'; ctx.font = '10px monospace';
+    ctx.fillText(price.toFixed(0), W - pad.r + 4, y + 3);
+  }
+
+  // Divider: context vs future
+  if (futureBars) {
+    const divX = px(candles.length - 0.5);
+    ctx.strokeStyle = 'rgba(88,166,255,.6)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(divX, pad.t); ctx.lineTo(divX, H - volPanelH - 10); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(88,166,255,.15)';
+    ctx.fillRect(divX, pad.t, W - pad.r - divX, chartH);
+    // label
+    ctx.fillStyle = '#58a6ff'; ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('▶ 未來30分', divX + 4, pad.t + 12);
+  }
+
+  // Candles
+  const bw = Math.max(1, chartW / n - 1);
+  allBars.forEach((b, i) => {
+    const bull = b.c >= b.o;
+    const color = i >= candles.length ? (futureBars ? (bull ? '#3fb950' : '#f85149') : (bull ? BULL : BEAR)) : (bull ? BULL : BEAR);
+    const x = px(i);
+    const yO = py(b.o), yC = py(b.c), yH = py(b.h), yL = py(b.l);
+
+    // Wick
+    ctx.strokeStyle = WICK; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+
+    // Body
+    ctx.fillStyle = color;
+    const bodyY = Math.min(yO, yC);
+    const bodyH = Math.max(1, Math.abs(yO - yC));
+    ctx.fillRect(x - bw / 2, bodyY, bw, bodyH);
+
+    // Volume
+    const vColor = bull ? VOL_BULL : VOL_BEAR;
+    ctx.fillStyle = vColor;
+    ctx.fillRect(x - bw / 2, vy(b.v), bw, H - vy(b.v) - 4);
+  });
+
+  // Time labels (every 12 bars = 1 hr)
+  ctx.fillStyle = '#7d8590'; ctx.font = '9px monospace';
+  allBars.forEach((b, i) => {
+    if (i % 12 === 0) {
+      ctx.fillText(b.t.split(' ')[1] || b.t.slice(-5), px(i) - 12, H - 2);
+    }
+  });
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let currentIdx = 0;
+let totalCards = 0;
+let mode = 'random';
+let answered = false;
+
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+async function init() {
+  const meta = await api('/api/meta');
+  document.getElementById('periodLabel').textContent = meta.period;
+  totalCards = meta.total_cards;
+  await nextCard();
+}
+
+async function setMode(m) {
+  mode = m;
+  document.getElementById('modeRandom').classList.toggle('active', m === 'random');
+  document.getElementById('modeSeq').classList.toggle('active', m === 'sequential');
+  await nextCard();
+}
+
+async function nextCard() {
+  answered = false;
+  document.getElementById('questionBox').style.display = '';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('mainChart').style.display = 'none';
+
+  const url = mode === 'random'
+    ? '/api/card?mode=random'
+    : `/api/card?mode=sequential&idx=${currentIdx}`;
+
+  const card = await api(url);
+  currentIdx = card.idx;
+
+  document.getElementById('cardDate').textContent =
+    `${card.date}  ${card.time}  （第 ${card.idx + 1} / ${card.total} 張）`;
+  document.getElementById('cardBadge').textContent = `NAS100 5min`;
+  document.getElementById('entryLabel').textContent =
+    `入場價 ${card.entry.toLocaleString()}`;
+
+  const canvas = document.getElementById('mainChart');
+  document.getElementById('loading').style.display = 'none';
+  canvas.style.display = 'block';
+  drawChart(canvas, card.context, null);
+}
+
+async function submitAnswer(ans) {
+  if (answered) return;
+  answered = true;
+
+  const data = await api(`/api/answer?idx=${currentIdx}&answer=${ans}`);
+
+  // Draw future on chart
+  const card = await api(`/api/card?mode=sequential&idx=${currentIdx}`);
+  const canvas = document.getElementById('mainChart');
+  drawChart(canvas, card.context, data.future);
+
+  document.getElementById('questionBox').style.display = 'none';
+  const box = document.getElementById('resultBox');
+  box.style.display = 'block';
+
+  const ok = data.is_correct;
+  box.className = `result-box ${ok ? 'correct' : 'wrong'}`;
+  document.getElementById('resultTitle').textContent =
+    ok ? `✓ 正確！答案是 ${data.correct}` : `✗ 答錯  你答 ${ans}，正確是 ${data.correct}`;
+
+  const sign = n => (n > 0 ? '+' : '') + n.toFixed(3) + '%';
+  document.getElementById('rNet').textContent  = sign(data.net_pct);
+  document.getElementById('rNet').style.color  = data.net_pct > 0 ? 'var(--green)' : data.net_pct < 0 ? 'var(--red)' : 'var(--muted)';
+  document.getElementById('rUp').textContent   = '+' + data.up_pct.toFixed(3) + '%';
+  document.getElementById('rDown').textContent = '-' + data.down_pct.toFixed(3) + '%';
+
+  document.getElementById('futureLabel').textContent =
+    `30分收盤：${data.future.slice(-1)[0].c.toLocaleString()}`;
+
+  // Update score
+  updateScore(data.score);
+
+  if (mode === 'sequential') currentIdx++;
+}
+
+async function updateScore(score) {
+  if (!score) {
+    const s = await api('/api/score');
+    score = s;
+  }
+  document.getElementById('sCorrect').textContent  = score.correct;
+  document.getElementById('sWrong').textContent    = score.wrong;
+  const pct = score.total ? (score.correct / score.total * 100).toFixed(1) + '%' : '—';
+  document.getElementById('sAccuracy').textContent = pct;
+}
+
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if (!confirm('確定重置分數嗎？')) return;
+  await api('/api/reset');
+  updateScore({ correct: 0, wrong: 0, total: 0 });
+  currentIdx = 0;
+  await nextCard();
+});
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'BUTTON') return;
+  const k = e.key.toUpperCase();
+  if (!answered) {
+    if (k === 'B') submitAnswer('BUY');
+    else if (k === 'S') submitAnswer('SELL');
+    else if (k === 'H') submitAnswer('HOLD');
+    else if (k === 'N' || k === ' ') nextCard();
+  } else {
+    if (k === 'N' || k === ' ') nextCard();
+  }
+  if (k === ' ') e.preventDefault();
+});
+
+window.addEventListener('resize', () => {
+  // Redraw on resize (no refetch needed if canvas is already painted)
+});
+
+init();
+</script>
+</body>
+</html>
