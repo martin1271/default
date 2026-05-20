@@ -35,6 +35,17 @@ def keltner_channels(high, low, close, period=20, mult=1.5):
     mid = ema(close, period)
     return mid + mult * atr, mid, mid - mult * atr
 
+def _linreg_last(x):
+    """Vectorised linear regression — returns last fitted value."""
+    n = len(x)
+    xi = np.arange(n, dtype=np.float64)
+    xi_mean = (n - 1) / 2.0
+    xi_var  = np.sum((xi - xi_mean) ** 2)
+    if xi_var == 0:
+        return x[-1]
+    slope = np.sum((xi - xi_mean) * (x - x.mean())) / xi_var
+    return slope * (n - 1) + (x.mean() - slope * xi_mean)
+
 def squeeze_momentum(high, low, close, period=20, bb_mult=2.0, kc_mult=1.5):
     bb_u, bb_m, bb_l = bollinger_bands(close, period, bb_mult)
     kc_u, kc_m, kc_l = keltner_channels(high, low, close, period, kc_mult)
@@ -45,10 +56,7 @@ def squeeze_momentum(high, low, close, period=20, bb_mult=2.0, kc_mult=1.5):
     ll = low.rolling(period).min()
     delta = close - (hh + ll) / 2
 
-    mom = delta.rolling(period).apply(
-        lambda x: np.polyval(np.polyfit(range(len(x)), x, 1), len(x) - 1),
-        raw=True
-    )
+    mom = delta.rolling(period).apply(_linreg_last, raw=True)
     return mom, sqz_on
 
 # ---------------------------------------------------------------------------

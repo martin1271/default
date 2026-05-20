@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAS100 Trading Flashcards</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131722; color:#d1d4dc; font-family:-apple-system,BlinkMacSystemFont,"Trebuchet MS",sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+.header { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#1e222d; border-bottom:1px solid #2a2e39; flex-shrink:0; }
+.header-title { font-size:15px; font-weight:700; letter-spacing:.5px; }
+.header-sub   { font-size:11px; color:#787b86; margin-top:2px; }
+.score-panel  { display:flex; gap:22px; }
+.score-item   { text-align:center; }
+.score-label  { font-size:10px; color:#787b86; text-transform:uppercase; letter-spacing:.5px; }
+.score-value  { font-size:22px; font-weight:700; line-height:1.1; }
+.sc-correct { color:#26a69a; }
+.sc-wrong   { color:#ef5350; }
+.sc-streak  { color:#f59f00; }
+
+.chart-area { flex:1; min-height:0; }
+#chart { width:100%; height:100%; }
+
+.action-bar { flex-shrink:0; display:flex; justify-content:center; align-items:center; gap:14px; padding:10px 20px; background:#1e222d; border-top:1px solid #2a2e39; }
+.action-hint { font-size:12px; color:#787b86; text-align:center; min-width:150px; line-height:1.5; }
+
+.btn { padding:12px 44px; font-size:16px; font-weight:700; border:none; border-radius:5px; cursor:pointer; text-transform:uppercase; letter-spacing:1px; transition:filter .15s, transform .1s; }
+.btn:hover  { filter:brightness(1.15); transform:translateY(-1px); }
+.btn:active { transform:translateY(0);  filter:brightness(.9); }
+.btn-buy  { background:#26a69a; color:#fff; }
+.btn-sell { background:#ef5350; color:#fff; }
+.btn-next { background:#2a2e39; color:#d1d4dc; border:1px solid #434651; padding:12px 32px; }
+
+.result-pill { display:flex; align-items:center; gap:10px; padding:8px 18px; border-radius:6px; font-weight:700; }
+.result-correct { background:rgba(38,166,154,.12); border:1px solid #26a69a; }
+.result-wrong   { background:rgba(239,83,80,.12);  border:1px solid #ef5350; }
+.result-icon { font-size:20px; }
+.result-text { font-size:14px; }
+.result-pips { font-size:12px; font-weight:400; color:#787b86; margin-top:2px; }
+
+.kbd-hint { font-size:11px; color:#4a4f5e; text-align:center; line-height:1.8; }
+kbd { background:#2a2e39; border:1px solid #434651; border-radius:3px; padding:1px 5px; font-size:10px; color:#787b86; }
+
+.progress { font-size:11px; color:#4a4f5e; white-space:nowrap; }
+
+#overlay { position:fixed; inset:0; background:rgba(19,23,34,.9); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999; gap:14px; }
+.spinner { width:36px; height:36px; border:3px solid #2a2e39; border-top-color:#26a69a; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.overlay-text { font-size:13px; color:#787b86; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-title">NAS100 · 5分鐘圖 · 買賣測試</div>
+    <div class="header-sub" id="ts">—</div>
+  </div>
+  <div class="score-panel">
+    <div class="score-item"><div class="score-label">正確</div><div class="score-value sc-correct" id="sc-c">0</div></div>
+    <div class="score-item"><div class="score-label">錯誤</div> <div class="score-value sc-wrong"   id="sc-w">0</div></div>
+    <div class="score-item"><div class="score-label">準確率</div><div class="score-value"           id="sc-p">—</div></div>
+    <div class="score-item"><div class="score-label">連勝</div> <div class="score-value sc-streak"  id="sc-s">0</div></div>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="chart-area"><div id="chart"></div></div>
+
+<!-- Decision bar -->
+<div class="action-bar" id="bar-decide">
+  <div class="action-hint">30分鐘後 (6根K線)<br>漲還是跌？</div>
+  <button class="btn btn-buy"  onclick="answer('BUY')">▲ 買入 Long</button>
+  <button class="btn btn-sell" onclick="answer('SELL')">▼ 賣出 Short</button>
+  <div class="kbd-hint"><kbd>B</kbd> 買入 &nbsp; <kbd>S</kbd> 賣出<br><kbd>Space</kbd> / <kbd>Enter</kbd> 下一題</div>
+</div>
+
+<!-- Answer bar -->
+<div class="action-bar" id="bar-answer" style="display:none">
+  <div id="result-pill"></div>
+  <button class="btn btn-next" onclick="next()">下一題 →</button>
+  <div class="progress" id="prog"></div>
+</div>
+
+<!-- Loading overlay -->
+<div id="overlay">
+  <div class="spinner"></div>
+  <div class="overlay-text" id="overlay-txt">載入圖表中...</div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const CARDS = __CARDS_JSON__;
+
+// ── Scores (localStorage) ─────────────────────────────────────────────────────
+let S = JSON.parse(localStorage.getItem('nas100_v2') || '{"c":0,"w":0,"s":0}');
+function saveScores(){ localStorage.setItem('nas100_v2', JSON.stringify(S)); }
+function renderScores(){
+  document.getElementById('sc-c').textContent = S.c;
+  document.getElementById('sc-w').textContent = S.w;
+  const t = S.c + S.w;
+  document.getElementById('sc-p').textContent = t ? Math.round(S.c/t*100)+'%' : '—';
+  document.getElementById('sc-s').textContent = S.s;
+}
+
+// ── Shuffle ───────────────────────────────────────────────────────────────────
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+let order = shuffle([...Array(CARDS.length).keys()]);
+let pos   = 0;
+let done  = false;
+
+// ── Keyboard ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if(e.repeat) return;
+  if(!done){ if(e.key==='b'||e.key==='B') answer('BUY'); else if(e.key==='s'||e.key==='S') answer('SELL'); }
+  else      { if(e.key===' '||e.key==='Enter'){ e.preventDefault(); next(); } }
+});
+
+// ── Plotly helpers ────────────────────────────────────────────────────────────
+const BG='#131722', GRID='#1e222d', AX='#2a2e39';
+let ready = false;
+
+function traces(cd){
+  const t = cd.times.map(s=>new Date(s));
+  const R = [];
+  // EMA clouds
+  R.push({type:'scatter',x:t,y:cd.ema9, mode:'lines',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  R.push({type:'scatter',x:t,y:cd.ema8, mode:'lines',fill:'tonexty',fillcolor:'rgba(0,188,212,.16)',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  R.push({type:'scatter',x:t,y:cd.ema34,mode:'lines',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  R.push({type:'scatter',x:t,y:cd.ema12,mode:'lines',fill:'tonexty',fillcolor:'rgba(103,58,183,.16)',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  // Bollinger Bands
+  R.push({type:'scatter',x:t,y:cd.bb_upper,mode:'lines',line:{color:'rgba(239,83,80,.55)',width:1,dash:'dot'},showlegend:false,hoverinfo:'skip',yaxis:'y',name:'BB+'});
+  R.push({type:'scatter',x:t,y:cd.bb_lower,mode:'lines',fill:'tonexty',fillcolor:'rgba(38,166,154,.04)',line:{color:'rgba(38,166,154,.55)',width:1,dash:'dot'},showlegend:false,hoverinfo:'skip',yaxis:'y',name:'BB-'});
+  // EMA lines
+  [{k:'ema8',c:'#00e5ff',w:1.2},{k:'ema9',c:'#00bcd4',w:1.2},{k:'ema12',c:'#69f0ae',w:1.2},
+   {k:'ema34',c:'#ff6d00',w:1.5},{k:'ema50',c:'#42a5f5',w:1.2},{k:'ema89',c:'#ce93d8',w:1.2},
+   {k:'ema200',c:'#f44336',w:2}].forEach(e=>{
+    R.push({type:'scatter',x:t,y:cd[e.k],mode:'lines',line:{color:e.c,width:e.w},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  });
+  // Candlesticks
+  R.push({type:'candlestick',x:t,open:cd.open,high:cd.high,low:cd.low,close:cd.close,
+    name:'NAS100',yaxis:'y',
+    increasing:{line:{color:'#26a69a'},fillcolor:'#26a69a'},
+    decreasing:{line:{color:'#ef5350'},fillcolor:'#ef5350'},
+    hovertemplate:'O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'});
+  // Squeeze Momentum
+  R.push({type:'bar',x:t,y:cd.momentum,marker:{color:cd.squeeze_colors},
+    name:'Squeeze',yaxis:'y2',showlegend:false,hovertemplate:'%{y:.1f}<extra>Squeeze</extra>'});
+  return R;
+}
+
+function layout(price){
+  return {
+    paper_bgcolor:BG,plot_bgcolor:BG,
+    font:{color:'#d1d4dc',size:11},
+    margin:{l:0,r:66,t:4,b:4},
+    xaxis:{rangeslider:{visible:false},gridcolor:GRID,linecolor:AX,tickcolor:AX,type:'date'},
+    yaxis:{domain:[.24,1],gridcolor:GRID,linecolor:AX,tickcolor:AX,side:'right',autorange:true},
+    yaxis2:{domain:[0,.21],gridcolor:GRID,linecolor:AX,zeroline:true,zerolinecolor:'#434651',zerolinewidth:1,side:'right'},
+    shapes:[{type:'line',xref:'paper',x0:0,x1:1,yref:'y',y0:price,y1:price,
+             line:{color:'#a09050',width:1.5,dash:'dash'}}],
+    annotations:[{xref:'paper',x:1.01,yref:'y',y:price,text:price.toFixed(1),showarrow:false,
+      font:{color:'#f5c842',size:12,family:'monospace'},align:'left',
+      bgcolor:'#2a2e39',borderpad:4,borderwidth:1,bordercolor:'#434651'}],
+    showlegend:false,hovermode:'x unified',dragmode:'pan',
+    hoverlabel:{bgcolor:'#1e222d',bordercolor:'#434651',font:{color:'#d1d4dc',size:11}}
+  };
+}
+
+const CFG = {displayModeBar:false,scrollZoom:true,responsive:true};
+
+function showCard(card){
+  const tr = traces(card.chart);
+  const ly = layout(card.current_price);
+  if(!ready){ Plotly.newPlot('chart',tr,ly,CFG); ready=true; }
+  else       { Plotly.react('chart',tr,ly,CFG); }
+  const d = new Date(card.timestamp);
+  document.getElementById('ts').textContent =
+    d.toLocaleString('zh-TW') + '  ·  第 '+(pos+1)+' / '+CARDS.length+' 題';
+}
+
+function revealFuture(fc, direction){
+  const ft = fc.times.map(s=>new Date(s));
+  const fc2 = fc.future_candles || fc;
+  const fill = direction==='BUY' ? 'rgba(38,166,154,.08)' : 'rgba(239,83,80,.08)';
+  Plotly.relayout('chart',{
+    'shapes[1]':{type:'rect',xref:'x',yref:'paper',x0:ft[0],x1:ft[ft.length-1],y0:.24,y1:1,fillcolor:fill,line:{width:0}},
+    'shapes[2]':{type:'line',xref:'x',yref:'paper',x0:ft[0],x1:ft[0],y0:0,y1:1,line:{color:'#787b86',width:1,dash:'dot'}}
+  });
+  Plotly.addTraces('chart',[{
+    type:'candlestick',x:ft,open:fc2.open||fc.open,high:fc2.high||fc.high,
+    low:fc2.low||fc.low,close:fc2.close||fc.close,
+    name:'30分鐘後',yaxis:'y',
+    increasing:{line:{color:'rgba(38,166,154,.9)'},fillcolor:'rgba(38,166,154,.55)'},
+    decreasing:{line:{color:'rgba(239,83,80,.9)'},fillcolor:'rgba(239,83,80,.55)'},
+    hovertemplate:'[未來] C:%{close:.1f}<extra></extra>'
+  }]);
+}
+
+// ── Game ──────────────────────────────────────────────────────────────────────
+function load(){
+  done = false;
+  document.getElementById('bar-decide').style.display = 'flex';
+  document.getElementById('bar-answer').style.display = 'none';
+  document.getElementById('overlay').style.display    = 'flex';
+  document.getElementById('overlay-txt').textContent  = '渲染圖表...';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    showCard(CARDS[order[pos]]);
+    document.getElementById('overlay').style.display = 'none';
+  }));
+}
+
+function answer(dir){
+  if(done) return;
+  done = true;
+  const card = CARDS[order[pos]];
+  const ans  = card.answer;
+  const ok   = ans.direction === dir;
+  if(ok){ S.c++; S.s++; } else { S.w++; S.s=0; }
+  saveScores(); renderScores();
+
+  const pip = (ans.pips>0?'+':'')+ans.pips.toFixed(1);
+  const lbl = ans.direction==='BUY' ? '▲ 買入 Long' : '▼ 賣出 Short';
+  const pill= document.getElementById('result-pill');
+  if(ok){
+    pill.className = 'result-pill result-correct';
+    pill.innerHTML = `<span class="result-icon">✓</span><div>
+      <div class="result-text" style="color:#26a69a">答對了！正確: ${lbl}</div>
+      <div class="result-pips">${ans.current_price} → ${ans.future_price} &nbsp;(${pip} pips · 30分鐘)</div></div>`;
+  } else {
+    pill.className = 'result-pill result-wrong';
+    pill.innerHTML = `<span class="result-icon">✗</span><div>
+      <div class="result-text" style="color:#ef5350">答錯了！正確: ${lbl}</div>
+      <div class="result-pips">${ans.current_price} → ${ans.future_price} &nbsp;(${pip} pips · 30分鐘)</div></div>`;
+  }
+  document.getElementById('prog').textContent = `第 ${pos+1} 題 / 共 ${CARDS.length} 題`;
+  document.getElementById('bar-decide').style.display = 'none';
+  document.getElementById('bar-answer').style.display = 'flex';
+  revealFuture(ans.future_candles, ans.direction);
+}
+
+function next(){
+  pos++;
+  if(pos >= order.length){ order = shuffle([...Array(CARDS.length).keys()]); pos=0; }
+  load();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderScores();
+load();
+</script>
+</body>
+</html>
