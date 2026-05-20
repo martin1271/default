@@ -33,14 +33,17 @@ def session_start(df, end_idx):
             return i + 1
     return max(0, end_idx - 78)
 
+DISPLAY_BARS = 48   # exactly 48 candles shown (4 hours of 5-min data)
+
 def build_card(df, end_idx, ind):
-    start_idx = session_start(df, end_idx)   # start of today's session
-    idx_range = range(start_idx, end_idx)
+    # Display window: last 48 bars, but not before today's session open
+    sess_start   = session_start(df, end_idx)
+    display_start = max(sess_start, end_idx - DISPLAY_BARS)
+    idx_range    = range(display_start, end_idx)
 
-    times  = [df.index[i].isoformat() for i in idx_range]
-    candle = {k: _safe_list(df[k], idx_range) for k in ['Open','High','Low','Close']}
+    times = [df.index[i].isoformat() for i in idx_range]
 
-    # Squeeze colours
+    # Squeeze colours (LazyBear style)
     squeeze_colors, prev_mom = [], 0.0
     for i in idx_range:
         m = ind['mom'].iloc[i]
@@ -53,14 +56,18 @@ def build_card(df, end_idx, ind):
 
     chart = dict(
         times=times,
-        open=candle['Open'], high=candle['High'],
-        low=candle['Low'],   close=candle['Close'],
-        **{f'ema{p}': _safe_list(ind['emas'][p], idx_range) for p in [8,9,12,34,50,89,200]},
-        bb_upper=_safe_list(ind['bb_u'], idx_range),
-        bb_mid  =_safe_list(ind['bb_m'], idx_range),
-        bb_lower=_safe_list(ind['bb_l'], idx_range),
-        momentum    =_safe_list(ind['mom'],    idx_range),
-        squeeze_on  =[bool(ind['sqz_on'].iloc[i]) if not pd.isna(ind['sqz_on'].iloc[i]) else False for i in idx_range],
+        open =_safe_list(df['Open'],  idx_range),
+        high =_safe_list(df['High'],  idx_range),
+        low  =_safe_list(df['Low'],   idx_range),
+        close=_safe_list(df['Close'], idx_range),
+        # Only EMA cloud pairs needed
+        ema8 =_safe_list(ind['emas'][8],  idx_range),
+        ema9 =_safe_list(ind['emas'][9],  idx_range),
+        ema12=_safe_list(ind['emas'][12], idx_range),
+        ema34=_safe_list(ind['emas'][34], idx_range),
+        momentum      =_safe_list(ind['mom'],    idx_range),
+        squeeze_on    =[bool(ind['sqz_on'].iloc[i]) if not pd.isna(ind['sqz_on'].iloc[i]) else False
+                        for i in idx_range],
         squeeze_colors=squeeze_colors,
     )
 

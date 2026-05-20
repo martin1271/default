@@ -3,264 +3,351 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NAS100 Trading Flashcards</title>
+<title>NAS100 Flashcards</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#131722; color:#d1d4dc; font-family:-apple-system,BlinkMacSystemFont,"Trebuchet MS",sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#131722;color:#d1d4dc;font-family:-apple-system,BlinkMacSystemFont,"Trebuchet MS",sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-.header { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#1e222d; border-bottom:1px solid #2a2e39; flex-shrink:0; }
-.header-title { font-size:15px; font-weight:700; letter-spacing:.5px; }
-.header-sub   { font-size:11px; color:#787b86; margin-top:2px; }
-.score-panel  { display:flex; gap:22px; }
-.score-item   { text-align:center; }
-.score-label  { font-size:10px; color:#787b86; text-transform:uppercase; letter-spacing:.5px; }
-.score-value  { font-size:22px; font-weight:700; line-height:1.1; }
-.sc-correct { color:#26a69a; }
-.sc-wrong   { color:#ef5350; }
-.sc-streak  { color:#f59f00; }
+/* ── header ─────────────────────────────────── */
+.hdr{display:flex;justify-content:space-between;align-items:center;padding:9px 18px;background:#1e222d;border-bottom:1px solid #2a2e39;flex-shrink:0}
+.hdr-l .title{font-size:14px;font-weight:700;letter-spacing:.4px}
+.hdr-l .sub{font-size:11px;color:#787b86;margin-top:2px}
+.stats{display:flex;gap:0}
+.stat-cell{text-align:center;padding:0 14px;border-right:1px solid #2a2e39}
+.stat-cell:last-child{border-right:none}
+.stat-lbl{font-size:9px;color:#787b86;text-transform:uppercase;letter-spacing:.5px}
+.stat-val{font-size:19px;font-weight:700;line-height:1.15}
+.c-green{color:#26a69a}.c-red{color:#ef5350}.c-gold{color:#f59f00}.c-blue{color:#42a5f5}.c-dim{color:#787b86}
 
-.chart-area { flex:1; min-height:0; }
-#chart { width:100%; height:100%; }
+/* ── chart ───────────────────────────────────── */
+.chart-wrap{flex:1;min-height:0}
+#chart{width:100%;height:100%}
 
-.action-bar { flex-shrink:0; display:flex; justify-content:center; align-items:center; gap:14px; padding:10px 20px; background:#1e222d; border-top:1px solid #2a2e39; }
-.action-hint { font-size:12px; color:#787b86; text-align:center; min-width:150px; line-height:1.5; }
+/* ── bottom bars ─────────────────────────────── */
+.bar{flex-shrink:0;display:flex;justify-content:center;align-items:center;gap:12px;padding:9px 16px;background:#1e222d;border-top:1px solid #2a2e39}
+.hint{font-size:11px;color:#787b86;text-align:center;line-height:1.6}
+.btn{padding:11px 0;font-size:15px;font-weight:700;border:none;border-radius:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:filter .15s,transform .1s;width:120px}
+.btn:hover{filter:brightness(1.18);transform:translateY(-1px)}
+.btn:active{transform:translateY(0);filter:brightness(.88)}
+.btn-buy {background:#26a69a;color:#fff}
+.btn-sell{background:#ef5350;color:#fff}
+.btn-hold{background:#2a2e39;color:#d1d4dc;border:1px solid #556}
+.btn-next{background:#2a2e39;color:#d1d4dc;border:1px solid #434651;width:110px;font-size:14px}
+kbd{background:#1a1d2a;border:1px solid #3a3f50;border-radius:3px;padding:1px 5px;font-size:10px;color:#787b86}
 
-.btn { padding:12px 44px; font-size:16px; font-weight:700; border:none; border-radius:5px; cursor:pointer; text-transform:uppercase; letter-spacing:1px; transition:filter .15s, transform .1s; }
-.btn:hover  { filter:brightness(1.15); transform:translateY(-1px); }
-.btn:active { transform:translateY(0);  filter:brightness(.9); }
-.btn-buy  { background:#26a69a; color:#fff; }
-.btn-sell { background:#ef5350; color:#fff; }
-.btn-next { background:#2a2e39; color:#d1d4dc; border:1px solid #434651; padding:12px 32px; }
+/* result pill */
+.pill{display:flex;align-items:center;gap:10px;padding:7px 16px;border-radius:6px;font-weight:700}
+.pill-win {background:rgba(38,166,154,.13);border:1px solid #26a69a}
+.pill-loss{background:rgba(239,83,80,.13); border:1px solid #ef5350}
+.pill-hold{background:rgba(120,123,134,.1);border:1px solid #555}
+.pill-icon{font-size:19px}
+.pill-main{font-size:13px}
+.pill-sub {font-size:11px;font-weight:400;color:#787b86;margin-top:2px}
 
-.result-pill { display:flex; align-items:center; gap:10px; padding:8px 18px; border-radius:6px; font-weight:700; }
-.result-correct { background:rgba(38,166,154,.12); border:1px solid #26a69a; }
-.result-wrong   { background:rgba(239,83,80,.12);  border:1px solid #ef5350; }
-.result-icon { font-size:20px; }
-.result-text { font-size:14px; }
-.result-pips { font-size:12px; font-weight:400; color:#787b86; margin-top:2px; }
+/* stats modal */
+#stats-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+.modal-box{background:#1e222d;border:1px solid #2a2e39;border-radius:10px;padding:28px 36px;min-width:320px;max-width:480px}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:18px;text-align:center}
+.stat-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #2a2e39;font-size:13px}
+.stat-row:last-child{border:none}
+.stat-row .lbl{color:#787b86}
+.stat-row .val{font-weight:700}
+.btn-close{margin-top:18px;width:100%;padding:10px;background:#2a2e39;border:1px solid #434651;border-radius:5px;color:#d1d4dc;cursor:pointer;font-size:14px}
 
-.kbd-hint { font-size:11px; color:#4a4f5e; text-align:center; line-height:1.8; }
-kbd { background:#2a2e39; border:1px solid #434651; border-radius:3px; padding:1px 5px; font-size:10px; color:#787b86; }
-
-.progress { font-size:11px; color:#4a4f5e; white-space:nowrap; }
-
-#overlay { position:fixed; inset:0; background:rgba(19,23,34,.9); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999; gap:14px; }
-.spinner { width:36px; height:36px; border:3px solid #2a2e39; border-top-color:#26a69a; border-radius:50%; animation:spin .8s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
-.overlay-text { font-size:13px; color:#787b86; }
+/* loading */
+#overlay{position:fixed;inset:0;background:rgba(19,23,34,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px}
+.spin{width:34px;height:34px;border:3px solid #2a2e39;border-top-color:#26a69a;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-txt{font-size:13px;color:#787b86}
 </style>
 </head>
 <body>
 
 <!-- Header -->
-<div class="header">
-  <div>
-    <div class="header-title">NAS100 · 5分鐘圖 · 買賣測試</div>
-    <div class="header-sub" id="ts">—</div>
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="title">NAS100 · 5分鐘 · 買賣閃卡</div>
+    <div class="sub" id="ts">—</div>
   </div>
-  <div class="score-panel">
-    <div class="score-item"><div class="score-label">正確</div><div class="score-value sc-correct" id="sc-c">0</div></div>
-    <div class="score-item"><div class="score-label">錯誤</div> <div class="score-value sc-wrong"   id="sc-w">0</div></div>
-    <div class="score-item"><div class="score-label">準確率</div><div class="score-value"           id="sc-p">—</div></div>
-    <div class="score-item"><div class="score-label">連勝</div> <div class="score-value sc-streak"  id="sc-s">0</div></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="stats">
+      <div class="stat-cell"><div class="stat-lbl">買/賣勝</div><div class="stat-val c-green" id="sc-win">0</div></div>
+      <div class="stat-cell"><div class="stat-lbl">買/賣負</div><div class="stat-val c-red"   id="sc-loss">0</div></div>
+      <div class="stat-cell"><div class="stat-lbl">勝率</div>  <div class="stat-val c-gold"  id="sc-wr">—</div></div>
+      <div class="stat-cell"><div class="stat-lbl">觀望</div>  <div class="stat-val c-blue"  id="sc-hold">0</div></div>
+      <div class="stat-cell"><div class="stat-lbl">題數</div>  <div class="stat-val c-dim"   id="sc-tot">0</div></div>
+    </div>
+    <button onclick="showStats()" style="padding:6px 12px;background:#2a2e39;border:1px solid #434651;border-radius:4px;color:#d1d4dc;cursor:pointer;font-size:12px">詳細統計</button>
   </div>
 </div>
 
 <!-- Chart -->
-<div class="chart-area"><div id="chart"></div></div>
+<div class="chart-wrap"><div id="chart"></div></div>
 
 <!-- Decision bar -->
-<div class="action-bar" id="bar-decide">
-  <div class="action-hint">30分鐘後 (6根K線)<br>漲還是跌？</div>
-  <button class="btn btn-buy"  onclick="answer('BUY')">▲ 買入 Long</button>
-  <button class="btn btn-sell" onclick="answer('SELL')">▼ 賣出 Short</button>
-  <div class="kbd-hint"><kbd>B</kbd> 買入 &nbsp; <kbd>S</kbd> 賣出<br><kbd>Space</kbd> / <kbd>Enter</kbd> 下一題</div>
+<div class="bar" id="bar-decide">
+  <div class="hint">30分鐘後 (6根K線)<br>漲 / 跌 / 觀望？</div>
+  <button class="btn btn-buy"  onclick="answer('BUY')">▲ 買入</button>
+  <button class="btn btn-hold" onclick="answer('HOLD')">— 觀望</button>
+  <button class="btn btn-sell" onclick="answer('SELL')">▼ 賣出</button>
+  <div class="hint" style="min-width:90px"><kbd>B</kbd>買入<br><kbd>H</kbd>觀望<br><kbd>S</kbd>賣出</div>
 </div>
 
 <!-- Answer bar -->
-<div class="action-bar" id="bar-answer" style="display:none">
-  <div id="result-pill"></div>
-  <button class="btn btn-next" onclick="next()">下一題 →</button>
-  <div class="progress" id="prog"></div>
+<div class="bar" id="bar-answer" style="display:none">
+  <div id="pill"></div>
+  <button class="btn btn-next" onclick="next()">下一題 →<br><span style="font-size:10px;font-weight:400;opacity:.6">Space / Enter</span></button>
 </div>
 
-<!-- Loading overlay -->
+<!-- Stats modal -->
+<div id="stats-modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">詳細統計</div>
+    <div class="stat-row"><span class="lbl">總題數</span>       <span class="val" id="m-tot">—</span></div>
+    <div class="stat-row"><span class="lbl">買入正確</span>     <span class="val c-green" id="m-bw">—</span></div>
+    <div class="stat-row"><span class="lbl">買入錯誤</span>     <span class="val c-red"   id="m-bl">—</span></div>
+    <div class="stat-row"><span class="lbl">賣出正確</span>     <span class="val c-green" id="m-sw">—</span></div>
+    <div class="stat-row"><span class="lbl">賣出錯誤</span>     <span class="val c-red"   id="m-sl">—</span></div>
+    <div class="stat-row"><span class="lbl">觀望次數</span>     <span class="val c-blue"  id="m-h">—</span></div>
+    <div class="stat-row" style="font-size:15px;padding-top:12px">
+      <span class="lbl" style="color:#d1d4dc;font-weight:600">買/賣勝率</span>
+      <span class="val c-gold" id="m-wr" style="font-size:18px">—</span>
+    </div>
+    <button class="btn-close" onclick="document.getElementById('stats-modal').style.display='none'">關閉</button>
+  </div>
+</div>
+
+<!-- Loading -->
 <div id="overlay">
-  <div class="spinner"></div>
-  <div class="overlay-text" id="overlay-txt">載入圖表中...</div>
+  <div class="spin"></div>
+  <div class="ov-txt" id="ov-txt">載入中...</div>
 </div>
 
 <script>
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ── Embedded data ─────────────────────────────────────────────────────────────
 const CARDS = __CARDS_JSON__;
 
-// ── Scores (localStorage) ─────────────────────────────────────────────────────
-let S = JSON.parse(localStorage.getItem('nas100_v2') || '{"c":0,"w":0,"s":0}');
-function saveScores(){ localStorage.setItem('nas100_v2', JSON.stringify(S)); }
+// ── State ─────────────────────────────────────────────────────────────────────
+const SKEY = 'nas100_v3';
+let S = JSON.parse(localStorage.getItem(SKEY) || '{"bw":0,"bl":0,"sw":0,"sl":0,"h":0}');
+let order  = shuffle([...Array(CARDS.length).keys()]);
+let pos    = 0, done = false;
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+function save(){ localStorage.setItem(SKEY, JSON.stringify(S)); }
+
+function winRate(){
+  const tot = S.bw+S.bl+S.sw+S.sl;
+  return tot ? Math.round((S.bw+S.sw)/tot*100) : null;
+}
 function renderScores(){
-  document.getElementById('sc-c').textContent = S.c;
-  document.getElementById('sc-w').textContent = S.w;
-  const t = S.c + S.w;
-  document.getElementById('sc-p').textContent = t ? Math.round(S.c/t*100)+'%' : '—';
-  document.getElementById('sc-s').textContent = S.s;
+  document.getElementById('sc-win').textContent  = S.bw+S.sw;
+  document.getElementById('sc-loss').textContent = S.bl+S.sl;
+  const wr = winRate();
+  document.getElementById('sc-wr').textContent   = wr !== null ? wr+'%' : '—';
+  document.getElementById('sc-hold').textContent  = S.h;
+  document.getElementById('sc-tot').textContent   = S.bw+S.bl+S.sw+S.sl+S.h;
+}
+function showStats(){
+  document.getElementById('m-tot').textContent = S.bw+S.bl+S.sw+S.sl+S.h;
+  document.getElementById('m-bw').textContent  = S.bw;
+  document.getElementById('m-bl').textContent  = S.bl;
+  document.getElementById('m-sw').textContent  = S.sw;
+  document.getElementById('m-sl').textContent  = S.sl;
+  document.getElementById('m-h').textContent   = S.h;
+  const wr = winRate();
+  document.getElementById('m-wr').textContent  = wr !== null ? wr+'%' : '—';
+  document.getElementById('stats-modal').style.display='flex';
 }
 
-// ── Shuffle ───────────────────────────────────────────────────────────────────
-function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-let order = shuffle([...Array(CARDS.length).keys()]);
-let pos   = 0;
-let done  = false;
-
 // ── Keyboard ─────────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', e=>{
   if(e.repeat) return;
-  if(!done){ if(e.key==='b'||e.key==='B') answer('BUY'); else if(e.key==='s'||e.key==='S') answer('SELL'); }
-  else      { if(e.key===' '||e.key==='Enter'){ e.preventDefault(); next(); } }
+  if(!done){
+    if(e.key==='b'||e.key==='B') answer('BUY');
+    else if(e.key==='s'||e.key==='S') answer('SELL');
+    else if(e.key==='h'||e.key==='H') answer('HOLD');
+  } else {
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); next(); }
+  }
 });
 
-// ── Plotly helpers ────────────────────────────────────────────────────────────
+// ── Chart ─────────────────────────────────────────────────────────────────────
 const BG='#131722', GRID='#1e222d', AX='#2a2e39';
-let ready = false;
+let chartReady = false;
 
-function traces(cd){
+/** Split-colour EMA cloud: green when fast>slow, red when fast<slow */
+function cloudTraces(t, fast, slow, cBull, cBear){
+  const result=[];
+  let segStart=-1, prevBull=null;
+
+  function flush(end){
+    if(segStart<0||end<=segStart) return;
+    const x  = t.slice(segStart,end);
+    const yF = fast.slice(segStart,end);
+    const yS = slow.slice(segStart,end);
+    const col = prevBull ? cBull : cBear;
+    result.push({type:'scatter',x,y:yS,mode:'lines',line:{color:'transparent',width:0},
+      showlegend:false,hoverinfo:'skip',yaxis:'y'});
+    result.push({type:'scatter',x,y:yF,mode:'lines',fill:'tonexty',fillcolor:col,
+      line:{color:'transparent',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
+  }
+
+  for(let i=0;i<t.length;i++){
+    if(fast[i]==null||slow[i]==null){ flush(i); segStart=-1; continue; }
+    const bull = fast[i]>=slow[i];
+    if(segStart<0){ segStart=i; prevBull=bull; continue; }
+    if(bull!==prevBull){ flush(i); segStart=i-1; prevBull=bull; }
+  }
+  flush(t.length);
+  return result;
+}
+
+function buildTraces(cd){
   const t = cd.times.map(s=>new Date(s));
-  const R = [];
-  // EMA clouds
-  R.push({type:'scatter',x:t,y:cd.ema9, mode:'lines',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
-  R.push({type:'scatter',x:t,y:cd.ema8, mode:'lines',fill:'tonexty',fillcolor:'rgba(0,188,212,.16)',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
-  R.push({type:'scatter',x:t,y:cd.ema34,mode:'lines',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
-  R.push({type:'scatter',x:t,y:cd.ema12,mode:'lines',fill:'tonexty',fillcolor:'rgba(103,58,183,.16)',line:{color:'rgba(0,0,0,0)',width:0},showlegend:false,hoverinfo:'skip',yaxis:'y'});
-  // Bollinger Bands
-  R.push({type:'scatter',x:t,y:cd.bb_upper,mode:'lines',line:{color:'rgba(239,83,80,.55)',width:1,dash:'dot'},showlegend:false,hoverinfo:'skip',yaxis:'y',name:'BB+'});
-  R.push({type:'scatter',x:t,y:cd.bb_lower,mode:'lines',fill:'tonexty',fillcolor:'rgba(38,166,154,.04)',line:{color:'rgba(38,166,154,.55)',width:1,dash:'dot'},showlegend:false,hoverinfo:'skip',yaxis:'y',name:'BB-'});
-  // EMA lines
-  [{k:'ema8',c:'#00e5ff',w:1.2},{k:'ema9',c:'#00bcd4',w:1.2},{k:'ema12',c:'#69f0ae',w:1.2},
-   {k:'ema34',c:'#ff6d00',w:1.5},{k:'ema50',c:'#42a5f5',w:1.2},{k:'ema89',c:'#ce93d8',w:1.2},
-   {k:'ema200',c:'#f44336',w:2}].forEach(e=>{
-    R.push({type:'scatter',x:t,y:cd[e.k],mode:'lines',line:{color:e.c,width:e.w},showlegend:false,hoverinfo:'skip',yaxis:'y'});
-  });
+  const tr = [];
+
+  // EMA clouds (colour-switching)
+  tr.push(...cloudTraces(t, cd.ema8,  cd.ema9,  'rgba(38,166,154,.25)', 'rgba(239,83,80,.25)'));
+  tr.push(...cloudTraces(t, cd.ema12, cd.ema34, 'rgba(38,166,154,.18)', 'rgba(239,83,80,.18)'));
+
   // Candlesticks
-  R.push({type:'candlestick',x:t,open:cd.open,high:cd.high,low:cd.low,close:cd.close,
+  tr.push({type:'candlestick',x:t,open:cd.open,high:cd.high,low:cd.low,close:cd.close,
     name:'NAS100',yaxis:'y',
     increasing:{line:{color:'#26a69a'},fillcolor:'#26a69a'},
     decreasing:{line:{color:'#ef5350'},fillcolor:'#ef5350'},
     hovertemplate:'O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'});
+
   // Squeeze Momentum
-  R.push({type:'bar',x:t,y:cd.momentum,marker:{color:cd.squeeze_colors},
-    name:'Squeeze',yaxis:'y2',showlegend:false,hovertemplate:'%{y:.1f}<extra>Squeeze</extra>'});
-  return R;
+  tr.push({type:'bar',x:t,y:cd.momentum,marker:{color:cd.squeeze_colors},
+    name:'Squeeze',yaxis:'y2',showlegend:false,
+    hovertemplate:'%{y:.1f}<extra>Squeeze</extra>'});
+
+  return tr;
 }
 
-function layout(price, times){
-  // Pin x-axis to current session: first bar → last bar + small right gap
+function buildLayout(price, times){
   const t0  = new Date(times[0]);
-  const t1  = new Date(times[times.length - 1]);
-  const gap = 4 * 5 * 60 * 1000;   // 4 bars of right padding so price tag is visible
+  const t1  = new Date(times[times.length-1]);
+  const gap = 3*5*60*1000;  // 3-bar right padding
   return {
-    paper_bgcolor:BG,plot_bgcolor:BG,
+    paper_bgcolor:BG, plot_bgcolor:BG,
     font:{color:'#d1d4dc',size:11},
-    margin:{l:0,r:66,t:4,b:4},
-    xaxis:{
-      rangeslider:{visible:false},gridcolor:GRID,linecolor:AX,tickcolor:AX,
-      type:'date',
-      range:[t0, new Date(t1.getTime() + gap)],
-    },
-    yaxis:{domain:[.24,1],gridcolor:GRID,linecolor:AX,tickcolor:AX,side:'right',autorange:true},
-    yaxis2:{domain:[0,.21],gridcolor:GRID,linecolor:AX,zeroline:true,zerolinecolor:'#434651',zerolinewidth:1,side:'right'},
-    shapes:[{type:'line',xref:'paper',x0:0,x1:1,yref:'y',y0:price,y1:price,
-             line:{color:'#a09050',width:1.5,dash:'dash'}}],
-    annotations:[{xref:'paper',x:1.01,yref:'y',y:price,text:price.toFixed(1),showarrow:false,
-      font:{color:'#f5c842',size:12,family:'monospace'},align:'left',
+    margin:{l:0,r:65,t:4,b:4},
+    xaxis:{rangeslider:{visible:false},gridcolor:GRID,linecolor:AX,tickcolor:AX,
+      type:'date',range:[t0, new Date(t1.getTime()+gap)]},
+    yaxis:{domain:[.26,1],gridcolor:GRID,linecolor:AX,tickcolor:AX,side:'right',autorange:true},
+    yaxis2:{domain:[0,.23],gridcolor:GRID,linecolor:AX,
+      zeroline:true,zerolinecolor:'#3a3f50',zerolinewidth:1,side:'right'},
+    shapes:[
+      {type:'line',xref:'paper',x0:0,x1:1,yref:'y',y0:price,y1:price,
+       line:{color:'#a09050',width:1,dash:'dash'}}
+    ],
+    annotations:[{xref:'paper',x:1.01,yref:'y',y:price,text:price.toFixed(1),
+      showarrow:false,font:{color:'#f5c842',size:12,family:'monospace'},align:'left',
       bgcolor:'#2a2e39',borderpad:4,borderwidth:1,bordercolor:'#434651'}],
-    showlegend:false,hovermode:'x unified',dragmode:'pan',
+    showlegend:false, hovermode:'x unified', dragmode:'pan',
     hoverlabel:{bgcolor:'#1e222d',bordercolor:'#434651',font:{color:'#d1d4dc',size:11}}
   };
 }
 
-const CFG = {displayModeBar:false,scrollZoom:true,responsive:true};
+const CFG={displayModeBar:false,scrollZoom:true,responsive:true};
 
-function showCard(card){
-  const tr = traces(card.chart);
-  const ly = layout(card.current_price, card.chart.times);
-  if(!ready){ Plotly.newPlot('chart',tr,ly,CFG); ready=true; }
-  else       { Plotly.react('chart',tr,ly,CFG); }
+function renderCard(card){
+  const tr = buildTraces(card.chart);
+  const ly = buildLayout(card.current_price, card.chart.times);
+  if(!chartReady){ Plotly.newPlot('chart',tr,ly,CFG); chartReady=true; }
+  else            { Plotly.react('chart',tr,ly,CFG); }
   const d = new Date(card.timestamp);
   document.getElementById('ts').textContent =
-    d.toLocaleString('zh-TW') + '  ·  第 '+(pos+1)+' / '+CARDS.length+' 題';
+    d.toLocaleString('zh-TW')+'  ·  第'+(pos+1)+'/'+CARDS.length+'題  ·  48根K線';
 }
 
 function revealFuture(fc, direction){
   const ft  = fc.times.map(s=>new Date(s));
   const fill = direction==='BUY' ? 'rgba(38,166,154,.10)' : 'rgba(239,83,80,.10)';
-  // Extend x-axis to show future candles + small right padding
-  const padMs = 5 * 60 * 1000;  // 5-min padding
+  const pad  = 2*5*60*1000;
   Plotly.relayout('chart',{
-    'xaxis.range[1]': new Date(ft[ft.length-1].getTime() + padMs),
-    'shapes[1]':{type:'rect',xref:'x',yref:'paper',
-      x0:ft[0],x1:ft[ft.length-1],y0:.24,y1:1,fillcolor:fill,line:{width:0}},
-    'shapes[2]':{type:'line',xref:'x',yref:'paper',
-      x0:ft[0],x1:ft[0],y0:0,y1:1,line:{color:'#787b86',width:1,dash:'dot'}}
+    'xaxis.range[1]': new Date(ft[ft.length-1].getTime()+pad),
+    'shapes[1]':{type:'rect',xref:'x',yref:'paper',x0:ft[0],x1:ft[ft.length-1],
+      y0:.26,y1:1,fillcolor:fill,line:{width:0}},
+    'shapes[2]':{type:'line',xref:'x',yref:'paper',x0:ft[0],x1:ft[0],
+      y0:0,y1:1,line:{color:'#787b86',width:1,dash:'dot'}}
   });
   Plotly.addTraces('chart',[{
     type:'candlestick',x:ft,
-    open:fc.open, high:fc.high, low:fc.low, close:fc.close,
+    open:fc.open,high:fc.high,low:fc.low,close:fc.close,
     name:'30分鐘後',yaxis:'y',
-    increasing:{line:{color:'#26a69a'},fillcolor:'rgba(38,166,154,.7)'},
-    decreasing:{line:{color:'#ef5350'},fillcolor:'rgba(239,83,80,.7)'},
+    increasing:{line:{color:'#26a69a',width:2},fillcolor:'rgba(38,166,154,.65)'},
+    decreasing:{line:{color:'#ef5350',width:2},fillcolor:'rgba(239,83,80,.65)'},
     hovertemplate:'[未來] O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'
   }]);
 }
 
-// ── Game ──────────────────────────────────────────────────────────────────────
+// ── Game logic ─────────────────────────────────────────────────────────────────
 function load(){
-  done = false;
-  document.getElementById('bar-decide').style.display = 'flex';
-  document.getElementById('bar-answer').style.display = 'none';
-  document.getElementById('overlay').style.display    = 'flex';
-  document.getElementById('overlay-txt').textContent  = '渲染圖表...';
+  done=false;
+  document.getElementById('bar-decide').style.display='flex';
+  document.getElementById('bar-answer').style.display='none';
+  document.getElementById('overlay').style.display='flex';
+  document.getElementById('ov-txt').textContent='渲染圖表...';
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    showCard(CARDS[order[pos]]);
-    document.getElementById('overlay').style.display = 'none';
+    renderCard(CARDS[order[pos]]);
+    document.getElementById('overlay').style.display='none';
   }));
 }
 
 function answer(dir){
   if(done) return;
-  done = true;
+  done=true;
   const card = CARDS[order[pos]];
   const ans  = card.answer;
-  const ok   = ans.direction === dir;
-  if(ok){ S.c++; S.s++; } else { S.w++; S.s=0; }
-  saveScores(); renderScores();
+  const pip  = (ans.pips>0?'+':'')+ans.pips.toFixed(1);
 
-  const pip = (ans.pips>0?'+':'')+ans.pips.toFixed(1);
-  const lbl = ans.direction==='BUY' ? '▲ 買入 Long' : '▼ 賣出 Short';
-  const pill= document.getElementById('result-pill');
-  if(ok){
-    pill.className = 'result-pill result-correct';
-    pill.innerHTML = `<span class="result-icon">✓</span><div>
-      <div class="result-text" style="color:#26a69a">答對了！正確: ${lbl}</div>
-      <div class="result-pips">${ans.current_price} → ${ans.future_price} &nbsp;(${pip} pips · 30分鐘)</div></div>`;
+  let pillClass, icon, mainText, subText;
+
+  if(dir==='HOLD'){
+    S.h++;
+    const dirLabel = ans.direction==='BUY' ? '漲了' : '跌了';
+    pillClass='pill-hold'; icon='—';
+    mainText=`觀望。實際${dirLabel} ${pip} pips`;
+    subText=`${ans.current_price} → ${ans.future_price}`;
   } else {
-    pill.className = 'result-pill result-wrong';
-    pill.innerHTML = `<span class="result-icon">✗</span><div>
-      <div class="result-text" style="color:#ef5350">答錯了！正確: ${lbl}</div>
-      <div class="result-pips">${ans.current_price} → ${ans.future_price} &nbsp;(${pip} pips · 30分鐘)</div></div>`;
+    const correct = ans.direction === dir;
+    if(dir==='BUY')  correct ? S.bw++ : S.bl++;
+    else             correct ? S.sw++ : S.sl++;
+    const dirLabel = ans.direction==='BUY' ? '▲ 買入' : '▼ 賣出';
+    if(correct){
+      pillClass='pill-win'; icon='✓';
+      mainText=`答對！正確: ${dirLabel}`;
+    } else {
+      pillClass='pill-loss'; icon='✗';
+      mainText=`答錯！正確: ${dirLabel}`;
+    }
+    subText=`${ans.current_price} → ${ans.future_price}  (${pip} pips · 30分鐘)`;
   }
-  document.getElementById('prog').textContent = `第 ${pos+1} 題 / 共 ${CARDS.length} 題`;
-  document.getElementById('bar-decide').style.display = 'none';
-  document.getElementById('bar-answer').style.display = 'flex';
+
+  save(); renderScores();
+
+  document.getElementById('pill').innerHTML=
+    `<div class="pill ${pillClass}">
+       <span class="pill-icon">${icon}</span>
+       <div><div class="pill-main">${mainText}</div><div class="pill-sub">${subText}</div></div>
+     </div>`;
+
+  document.getElementById('bar-decide').style.display='none';
+  document.getElementById('bar-answer').style.display='flex';
   revealFuture(ans.future_candles, ans.direction);
 }
 
 function next(){
   pos++;
-  if(pos >= order.length){ order = shuffle([...Array(CARDS.length).keys()]); pos=0; }
+  if(pos>=order.length){ order=shuffle([...Array(CARDS.length).keys()]); pos=0; }
   load();
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 renderScores();
 load();
 </script>
