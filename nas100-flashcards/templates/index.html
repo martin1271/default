@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAS100 Trading Flashcards</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #131722;
+  color: #d1d4dc;
+  font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: #1e222d;
+  border-bottom: 1px solid #2a2e39;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.header-left { display: flex; flex-direction: column; gap: 2px; }
+.header-title { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; color: #d1d4dc; }
+.header-subtitle { font-size: 11px; color: #787b86; }
+
+.score-panel { display: flex; gap: 24px; }
+.score-item { text-align: center; }
+.score-label { font-size: 10px; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; }
+.score-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.score-correct { color: #26a69a; }
+.score-wrong   { color: #ef5350; }
+.score-pct     { color: #d1d4dc; }
+.score-streak  { color: #f59f00; }
+
+/* ── Chart area ───────────────────────────────────────────── */
+.chart-area {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+#plotly-chart {
+  width: 100%;
+  height: 100%;
+}
+
+/* Decision / Answer bar */
+.action-bar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: #1e222d;
+  border-top: 1px solid #2a2e39;
+}
+
+.action-hint {
+  font-size: 12px;
+  color: #787b86;
+  text-align: center;
+  min-width: 160px;
+}
+
+.btn {
+  padding: 12px 48px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: filter 0.15s, transform 0.1s;
+}
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); filter: brightness(0.9); }
+
+.btn-buy  { background: #26a69a; color: #fff; }
+.btn-sell { background: #ef5350; color: #fff; }
+.btn-next { background: #2a2e39; color: #d1d4dc; border: 1px solid #434651; }
+
+/* Result pill */
+.result-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.result-correct { background: rgba(38,166,154,0.15); border: 1px solid #26a69a; }
+.result-wrong   { background: rgba(239,83,80,0.15);  border: 1px solid #ef5350; }
+.result-icon { font-size: 22px; }
+.result-text { font-size: 15px; }
+.result-pips { font-size: 13px; font-weight: 400; color: #787b86; }
+
+/* Loading overlay */
+#loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(19,23,34,0.92);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 999;
+  gap: 16px;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid #2a2e39;
+  border-top-color: #26a69a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: #787b86; }
+
+/* Keyboard hint */
+.kbd-hint {
+  font-size: 11px;
+  color: #4a4f5e;
+  text-align: center;
+}
+kbd {
+  background: #2a2e39;
+  border: 1px solid #434651;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: #787b86;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">NAS100 · 5分鐘 · 買賣測試</div>
+    <div class="header-subtitle" id="ts">載入中...</div>
+  </div>
+  <div class="score-panel">
+    <div class="score-item">
+      <div class="score-label">正確</div>
+      <div class="score-value score-correct" id="sc-correct">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">錯誤</div>
+      <div class="score-value score-wrong" id="sc-wrong">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">準確率</div>
+      <div class="score-value score-pct" id="sc-pct">—</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">連勝</div>
+      <div class="score-value score-streak" id="sc-streak">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="chart-area">
+  <div id="plotly-chart"></div>
+</div>
+
+<!-- Action bar -->
+<div class="action-bar" id="decision-bar">
+  <div class="action-hint">
+    30分鐘後 (6根蠟燭)<br>價格漲還是跌？
+  </div>
+  <button class="btn btn-buy"  onclick="submitAnswer('BUY')">▲ 買入 Long</button>
+  <button class="btn btn-sell" onclick="submitAnswer('SELL')">▼ 賣出 Short</button>
+  <div class="kbd-hint"><kbd>B</kbd> 買入 &nbsp; <kbd>S</kbd> 賣出 &nbsp; <kbd>Space</kbd> 下一題</div>
+</div>
+
+<div class="action-bar" id="answer-bar" style="display:none;">
+  <div id="result-pill"></div>
+  <div id="answer-detail" style="font-size:13px;color:#787b86;text-align:center;"></div>
+  <button class="btn btn-next" onclick="loadNextCard()">下一題 →</button>
+</div>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">正在載入 NAS100 資料...</div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let scores = JSON.parse(localStorage.getItem('nas100_scores') || '{"correct":0,"wrong":0,"streak":0}');
+let currentCardId = null;
+let answered = false;
+
+// ── Score display ─────────────────────────────────────────────────────────────
+function updateScores() {
+  document.getElementById('sc-correct').textContent = scores.correct;
+  document.getElementById('sc-wrong').textContent   = scores.wrong;
+  const total = scores.correct + scores.wrong;
+  document.getElementById('sc-pct').textContent = total > 0
+    ? Math.round(scores.correct / total * 100) + '%' : '—';
+  document.getElementById('sc-streak').textContent = scores.streak;
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (!answered) {
+    if (e.key === 'b' || e.key === 'B') submitAnswer('BUY');
+    if (e.key === 's' || e.key === 'S') submitAnswer('SELL');
+  } else {
+    if (e.key === ' ' || e.key === 'Enter') loadNextCard();
+  }
+});
+
+// ── Chart rendering ───────────────────────────────────────────────────────────
+const CHART_BG   = '#131722';
+const GRID_COLOR = '#1e222d';
+const AXIS_COLOR = '#2a2e39';
+
+function buildTraces(cd) {
+  const t = cd.times.map(s => new Date(s));
+  const traces = [];
+
+  // ─ EMA clouds (fill between pairs) ────────────────────────────────────────
+  // Cloud 1: EMA 8 / EMA 9  (fast momentum cloud)
+  traces.push({ type:'scatter', x:t, y:cd.ema9,  mode:'lines',
+    line:{color:'rgba(0,0,0,0)',width:0}, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+  traces.push({ type:'scatter', x:t, y:cd.ema8,  mode:'lines',
+    fill:'tonexty', fillcolor:'rgba(0,188,212,0.18)',
+    line:{color:'rgba(0,0,0,0)',width:0}, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+
+  // Cloud 2: EMA 12 / EMA 34  (trend cloud)
+  traces.push({ type:'scatter', x:t, y:cd.ema34, mode:'lines',
+    line:{color:'rgba(0,0,0,0)',width:0}, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+  traces.push({ type:'scatter', x:t, y:cd.ema12, mode:'lines',
+    fill:'tonexty', fillcolor:'rgba(103,58,183,0.18)',
+    line:{color:'rgba(0,0,0,0)',width:0}, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+
+  // ─ BB outer fill ───────────────────────────────────────────────────────────
+  traces.push({ type:'scatter', x:t, y:cd.bb_upper, mode:'lines',
+    line:{color:'rgba(239,83,80,0.5)',width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip', yaxis:'y', name:'BB上' });
+  traces.push({ type:'scatter', x:t, y:cd.bb_lower, mode:'lines',
+    fill:'tonexty', fillcolor:'rgba(38,166,154,0.04)',
+    line:{color:'rgba(38,166,154,0.5)',width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip', yaxis:'y', name:'BB下' });
+
+  // ─ Individual EMA lines ────────────────────────────────────────────────────
+  const emaLines = [
+    { key:'ema8',   color:'#00e5ff',  w:1.2 },
+    { key:'ema9',   color:'#00bcd4',  w:1.2 },
+    { key:'ema12',  color:'#69f0ae',  w:1.2 },
+    { key:'ema34',  color:'#ff6d00',  w:1.5 },
+    { key:'ema50',  color:'#42a5f5',  w:1.2 },
+    { key:'ema89',  color:'#ce93d8',  w:1.2 },
+    { key:'ema200', color:'#f44336',  w:2   },
+  ];
+  emaLines.forEach(cfg => {
+    traces.push({ type:'scatter', x:t, y:cd[cfg.key], mode:'lines',
+      line:{color:cfg.color,width:cfg.w}, showlegend:false, hoverinfo:'skip', yaxis:'y', name:cfg.key.toUpperCase() });
+  });
+
+  // ─ Candlesticks (on top) ───────────────────────────────────────────────────
+  traces.push({
+    type:'candlestick', x:t,
+    open:cd.open, high:cd.high, low:cd.low, close:cd.close,
+    name:'NAS100',
+    increasing:{ line:{color:'#26a69a'}, fillcolor:'#26a69a' },
+    decreasing:{ line:{color:'#ef5350'}, fillcolor:'#ef5350' },
+    yaxis:'y',
+    hovertemplate:'O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'
+  });
+
+  // ─ Squeeze Momentum histogram ──────────────────────────────────────────────
+  traces.push({
+    type:'bar', x:t,
+    y:cd.momentum,
+    marker:{ color:cd.squeeze_colors },
+    name:'Squeeze',
+    yaxis:'y2',
+    showlegend:false,
+    hovertemplate:'Mom:%{y:.1f}<extra></extra>'
+  });
+
+  return traces;
+}
+
+function buildLayout(currentPrice, times) {
+  const lastTime = times[times.length - 1];
+
+  return {
+    paper_bgcolor: CHART_BG,
+    plot_bgcolor:  CHART_BG,
+    font:  { color:'#d1d4dc', size:11 },
+    margin:{ l:0, r:65, t:4, b:4 },
+    xaxis: {
+      rangeslider:{ visible:false },
+      gridcolor:  GRID_COLOR,
+      linecolor:  AXIS_COLOR,
+      tickcolor:  AXIS_COLOR,
+      type:       'date',
+      domain:     [0, 1],
+    },
+    yaxis: {
+      domain:    [0.24, 1],
+      gridcolor: GRID_COLOR,
+      linecolor: AXIS_COLOR,
+      tickcolor: AXIS_COLOR,
+      side:      'right',
+      autorange: true,
+    },
+    yaxis2: {
+      domain:        [0, 0.21],
+      gridcolor:     GRID_COLOR,
+      linecolor:     AXIS_COLOR,
+      zeroline:      true,
+      zerolinecolor: '#434651',
+      zerolinewidth: 1,
+      side:          'right',
+    },
+    shapes:[{
+      type:'line', xref:'paper', x0:0, x1:1,
+      yref:'y',   y0:currentPrice, y1:currentPrice,
+      line:{ color:'#a09050', width:1.5, dash:'dash' }
+    }],
+    annotations:[{
+      xref:'paper', x:1.01,
+      yref:'y',     y:currentPrice,
+      text: currentPrice.toFixed(1),
+      showarrow:false,
+      font:{ color:'#f5c842', size:12, family:'monospace' },
+      align:'left',
+      bgcolor:'#2a2e39',
+      borderpad:4,
+      borderwidth:1,
+      bordercolor:'#434651',
+    }],
+    showlegend: false,
+    hovermode:  'x unified',
+    dragmode:   'pan',
+    hoverlabel: {
+      bgcolor:     '#1e222d',
+      bordercolor: '#434651',
+      font:{ color:'#d1d4dc', size:11 }
+    }
+  };
+}
+
+const PLOTLY_CONFIG = {
+  displayModeBar: false,
+  scrollZoom:     true,
+  responsive:     true,
+  doubleClick:    'autosize',
+};
+
+let chartInitialized = false;
+
+function renderChart(cd, currentPrice) {
+  const traces = buildTraces(cd);
+  const layout = buildLayout(currentPrice, cd.times);
+
+  if (!chartInitialized) {
+    Plotly.newPlot('plotly-chart', traces, layout, PLOTLY_CONFIG);
+    chartInitialized = true;
+  } else {
+    Plotly.react('plotly-chart', traces, layout, PLOTLY_CONFIG);
+  }
+}
+
+function addFutureOverlay(fc, direction) {
+  const ft = fc.times.map(s => new Date(s));
+  const dirColor = direction === 'BUY' ? '#26a69a' : '#ef5350';
+  const fillCol  = direction === 'BUY' ? 'rgba(38,166,154,0.08)' : 'rgba(239,83,80,0.08)';
+
+  // Shaded region
+  Plotly.relayout('plotly-chart', {
+    'shapes[1]': {
+      type:'rect', xref:'x', yref:'paper',
+      x0:ft[0], x1:ft[ft.length-1],
+      y0:0.24, y1:1,
+      fillcolor: fillCol,
+      line:{ width:0 }
+    },
+    'shapes[2]': {
+      type:'line', xref:'x', yref:'paper',
+      x0:ft[0], x1:ft[0],
+      y0:0, y1:1,
+      line:{ color:'#787b86', width:1, dash:'dot' }
+    }
+  });
+
+  // Future candles
+  Plotly.addTraces('plotly-chart', [{
+    type:'candlestick', x:ft,
+    open:fc.open, high:fc.high, low:fc.low, close:fc.close,
+    name:'30分鐘後',
+    increasing:{ line:{color:'rgba(38,166,154,0.9)'},  fillcolor:'rgba(38,166,154,0.55)' },
+    decreasing:{ line:{color:'rgba(239,83,80,0.9)'},   fillcolor:'rgba(239,83,80,0.55)'  },
+    yaxis:'y',
+    hovertemplate:'[未來] O:%{open:.1f} H:%{high:.1f} L:%{low:.1f} C:%{close:.1f}<extra></extra>'
+  }]);
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
+function loadNextCard() {
+  answered = false;
+  document.getElementById('decision-bar').style.display = 'flex';
+  document.getElementById('answer-bar').style.display   = 'none';
+  document.getElementById('loading-overlay').style.display = 'flex';
+
+  fetch('/api/card')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert('Error: ' + data.error); return; }
+      currentCardId = data.card_id;
+      document.getElementById('ts').textContent =
+        new Date(data.timestamp).toLocaleString('zh-TW') +
+        `  ·  資料庫: ${data.total_cards} 個場景`;
+
+      renderChart(data.chart_data, data.current_price);
+      document.getElementById('loading-overlay').style.display = 'none';
+    })
+    .catch(err => {
+      document.querySelector('.loading-text').textContent = '載入失敗: ' + err;
+    });
+}
+
+function submitAnswer(direction) {
+  if (answered) return;
+  answered = true;
+
+  document.getElementById('decision-bar').style.display = 'none';
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.querySelector('.loading-text').textContent = '計算結果...';
+
+  fetch('/api/answer/' + currentCardId)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('loading-overlay').style.display = 'none';
+
+      const correct = data.direction === direction;
+      if (correct) { scores.correct++; scores.streak++; }
+      else         { scores.wrong++;   scores.streak = 0; }
+      localStorage.setItem('nas100_scores', JSON.stringify(scores));
+      updateScores();
+
+      // Result pill
+      const pill = document.getElementById('result-pill');
+      const pipStr = (data.pips > 0 ? '+' : '') + data.pips.toFixed(1);
+      const dirLabel = data.direction === 'BUY' ? '▲ 買入 Long' : '▼ 賣出 Short';
+      if (correct) {
+        pill.className = 'result-pill result-correct';
+        pill.innerHTML = `<span class="result-icon">✓</span><div>
+          <div class="result-text" style="color:#26a69a">答對了！正確答案: ${dirLabel}</div>
+          <div class="result-pips">${data.current_price} → ${data.future_price}&nbsp;&nbsp;(${pipStr} pips / 30分鐘)</div>
+        </div>`;
+      } else {
+        pill.className = 'result-pill result-wrong';
+        pill.innerHTML = `<span class="result-icon">✗</span><div>
+          <div class="result-text" style="color:#ef5350">答錯了！正確答案: ${dirLabel}</div>
+          <div class="result-pips">${data.current_price} → ${data.future_price}&nbsp;&nbsp;(${pipStr} pips / 30分鐘)</div>
+        </div>`;
+      }
+
+      document.getElementById('answer-bar').style.display = 'flex';
+      addFutureOverlay(data.future_candles, data.direction);
+      document.querySelector('.loading-text').textContent = '正在載入 NAS100 資料...';
+    });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+updateScores();
+loadNextCard();
+</script>
+</body>
+</html>
