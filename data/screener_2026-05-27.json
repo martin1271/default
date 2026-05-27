@@ -1,0 +1,11 @@
+{
+  "date": "2026-05-27",
+  "criteria": {
+    "ytd_min_pct": 20.0,
+    "top_sector_count": 4,
+    "ema_alignment": "5>10>20>50>200 (bullish)"
+  },
+  "sector_ranking": [],
+  "leading_sectors": [],
+  "results": []
+}
