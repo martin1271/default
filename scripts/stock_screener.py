@@ -13,6 +13,12 @@ Run:
   python3 stock_screener.py --html                   # also save HTML report
 """
 
+import sys, io
+# Force UTF-8 output on Windows (avoids CP950 UnicodeEncodeError)
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 import sys
 import json
 import argparse
