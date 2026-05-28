@@ -361,6 +361,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .sector-lead {{ font-weight: 600; color: #e3b341; }}
   .badge  {{ display: inline-block; padding: 2px 8px; border-radius: 12px;
              background: #1f6feb33; color: #58a6ff; font-size: 0.78rem; }}
+  .tv-btn {{ display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+             padding: 8px 16px; background: #1565c0; color: #fff; border: none;
+             border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+             text-decoration: none; }}
+  .tv-btn:hover {{ background: #1976d2; }}
 </style>
 </head>
 <body>
@@ -371,6 +376,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   YTD &gt; {ytd_min}% &nbsp;·&nbsp;
   Top-{top_n} sectors
 </div>
+<br>
+<a class="tv-btn" href="{watchlist_filename}" download>
+  ⬇ Download TradingView Watchlist
+</a>
+<span style="color:#8b949e; font-size:0.8rem; margin-left:12px;">
+  TV → Watchlist panel → ⋮ → Import watchlist → select file
+</span>
 
 <h2>Sector Ranking (YTD)</h2>
 <table>
@@ -392,7 +404,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 
-def save_html_report(sector_ranking, leading_sectors, results, cfg):
+def save_html_report(sector_ranking, leading_sectors, results, cfg, watchlist_filename=""):
     sector_rows_html = ""
     for sector, gain in sector_ranking:
         is_lead = sector in leading_sectors
@@ -437,12 +449,53 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg):
         top_n=cfg["top_sector_count"],
         sector_rows=sector_rows_html,
         stock_rows=stock_rows_html or "<tr><td colspan='10'>No stocks passed filters today.</td></tr>",
+        watchlist_filename=watchlist_filename,
     )
 
     out_dir  = Path(__file__).parent.parent / "data"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / f"screener_{today}.html"
     out_path.write_text(html, encoding="utf-8")
+    return out_path
+
+
+def save_tradingview_watchlist(results: list, cfg: dict) -> "Path":
+    """
+    Export screened stocks as a TradingView-importable watchlist.
+    Format: ###Sector headers + one ticker per line.
+    Import in TV: Watchlist panel → ⋮ → Import watchlist → select this file.
+    """
+    today    = date.today().isoformat()
+    out_dir  = Path(__file__).parent.parent / "data"
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f"screener_{today}_watchlist.txt"
+
+    lines = [
+        f"### US Stock Screener {today}",
+        f"### Criteria: Bullish EMA (5>10>20>50>200) | YTD >{cfg['ytd_min_pct']:.0f}% | Top-{cfg['top_sector_count']} sectors",
+        "",
+    ]
+
+    # Group by sector, keep original YTD-descending order within each group
+    sectors_seen: list[str] = []
+    by_sector: dict[str, list] = {}
+    for s in results:
+        sec = s["sector"]
+        if sec not in by_sector:
+            by_sector[sec] = []
+            sectors_seen.append(sec)
+        by_sector[sec].append(s)
+
+    for sec in sectors_seen:
+        lines.append(f"###{sec}")
+        for s in by_sector[sec]:
+            ytd  = s["ytd_pct"]
+            rsi  = f"RSI {s['rsi14']:.0f}" if s["rsi14"] else ""
+            note = f"  # YTD {ytd:+.1f}%  {rsi}".rstrip()
+            lines.append(s["ticker"] + note)
+        lines.append("")
+
+    out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
 
 
@@ -509,11 +562,17 @@ def main():
     print_terminal_report(sector_ranking, leading_sectors, results, cfg)
 
     json_path = save_json_report(sector_ranking, leading_sectors, results, cfg)
-    print(f"  JSON  → {json_path}")
+    print(f"  JSON       → {json_path}")
+
+    tv_path = save_tradingview_watchlist(results, cfg)
+    print(f"  TV watchlist → {tv_path}")
 
     if args.html:
-        html_path = save_html_report(sector_ranking, leading_sectors, results, cfg)
-        print(f"  HTML  → {html_path}")
+        html_path = save_html_report(
+            sector_ranking, leading_sectors, results, cfg,
+            watchlist_filename=tv_path.name,
+        )
+        print(f"  HTML       → {html_path}")
 
     print()
 
