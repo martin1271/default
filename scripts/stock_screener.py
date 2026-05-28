@@ -20,6 +20,9 @@ import warnings
 from datetime import datetime, date
 from pathlib import Path
 
+# Line-buffered stdout so output is not swallowed in Windows Git Bash
+sys.stdout.reconfigure(line_buffering=True)
+
 warnings.filterwarnings("ignore")
 
 try:
