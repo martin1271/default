@@ -408,10 +408,11 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg):
 
     stock_rows_html = ""
     for i, s in enumerate(results, 1):
-        ema20  = s.get("ema20")
-        vs_ema = (f"{(s['price'] - ema20) / ema20 * 100:+.1f}%"
-                  if ema20 else "─")
-        rsi_str = f"{s['rsi14']:.0f}" if s["rsi14"] else "─"
+        ema20    = s.get("ema20")
+        vs_ema   = (f"{(s['price'] - ema20) / ema20 * 100:+.1f}%" if ema20 else "─")
+        rsi_str  = f"{s['rsi14']:.0f}" if s["rsi14"] else "─"
+        ema50_str  = f"{s['ema50']:.2f}"  if s["ema50"]  else "─"
+        ema200_str = f"{s['ema200']:.2f}" if s["ema200"] else "─"
         stock_rows_html += (
             f'<tr>'
             f'<td>{i}</td>'
@@ -422,8 +423,8 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg):
             f'<td>{s["sector"]}</td>'
             f'<td>{fmt_volume(s["avg_vol"])}</td>'
             f'<td>{vs_ema}</td>'
-            f'<td>{f"{s[\"ema50\"]:.2f}" if s["ema50"] else "─"}</td>'
-            f'<td>{f"{s[\"ema200\"]:.2f}" if s["ema200"] else "─"}</td>'
+            f'<td>{ema50_str}</td>'
+            f'<td>{ema200_str}</td>'
             f'</tr>\n'
         )
 
