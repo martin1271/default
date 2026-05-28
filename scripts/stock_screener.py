@@ -422,8 +422,8 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg):
             f'<td>{s["sector"]}</td>'
             f'<td>{fmt_volume(s["avg_vol"])}</td>'
             f'<td>{vs_ema}</td>'
-            f'<td>{s["ema50"]:.2f if s["ema50"] else "─"}</td>'
-            f'<td>{s["ema200"]:.2f if s["ema200"] else "─"}</td>'
+            f'<td>{f"{s[\"ema50\"]:.2f}" if s["ema50"] else "─"}</td>'
+            f'<td>{f"{s[\"ema200\"]:.2f}" if s["ema200"] else "─"}</td>'
             f'</tr>\n'
         )
 
