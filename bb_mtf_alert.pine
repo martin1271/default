@@ -1,0 +1,65 @@
+//@version=5
+indicator("BB Multi-TF Alert (2/3)", overlay=true)
+
+// ── 設定 ──────────────────────────────────────────────
+bbLength = input.int(20,  "BB 週期",    minval=1)
+bbMult   = input.float(2.0, "BB 倍數", minval=0.1, step=0.1)
+
+// ── 核心函式：回傳當前 context 是否突破布林帶 ──────────
+bbStatus() =>
+    [basis, upper, lower] = ta.bb(close, bbLength, bbMult)
+    [close > upper, close < lower]
+
+// ── 取三個時間框架的布林帶狀態 ────────────────────────
+// 注意：此指標需掛在 1m 圖上執行
+[above1m,  below1m]  = request.security(syminfo.tickerid, "1",  bbStatus())
+[above5m,  below5m]  = request.security(syminfo.tickerid, "5",  bbStatus())
+[above15m, below15m] = request.security(syminfo.tickerid, "15", bbStatus())
+
+// ── 統計突破數量 ───────────────────────────────────────
+aboveCnt = (above1m  ? 1 : 0) + (above5m  ? 1 : 0) + (above15m  ? 1 : 0)
+belowCnt = (below1m  ? 1 : 0) + (below5m  ? 1 : 0) + (below15m  ? 1 : 0)
+
+// ── 觸發條件：任意 2 張圖同時突破 ─────────────────────
+triggerUp   = aboveCnt >= 2
+triggerDown = belowCnt >= 2
+
+// 只在「剛變成 true」的那根 bar 發訊，避免重複
+newUp   = triggerUp   and not triggerUp[1]
+newDown = triggerDown and not triggerDown[1]
+
+// ── 視覺提示 ───────────────────────────────────────────
+bgcolor(triggerUp   ? color.new(color.green, 85) : na, title="多空背景-多")
+bgcolor(triggerDown ? color.new(color.red,   85) : na, title="多空背景-空")
+
+plotshape(newUp,   "突破上軌訊號", shape.triangleup,   location.belowbar, color.lime,  size=size.normal)
+plotshape(newDown, "突破下軌訊號", shape.triangledown, location.abovebar, color.red,   size=size.normal)
+
+// ── 狀態標籤（右上角）────────────────────────────────
+tf1Str  = above1m  ? "1m↑"  : below1m  ? "1m↓"  : "1m-"
+tf5Str  = above5m  ? "5m↑"  : below5m  ? "5m↓"  : "5m-"
+tf15Str = above15m ? "15m↑" : below15m ? "15m↓" : "15m-"
+labelTxt = tf1Str + " | " + tf5Str + " | " + tf15Str
+
+var label statusLabel = na
+label.delete(statusLabel)
+statusLabel := label.new(
+     bar_index, high,
+     labelTxt,
+     style    = label.style_label_left,
+     color    = triggerUp ? color.green : triggerDown ? color.red : color.gray,
+     textcolor= color.white,
+     size     = size.small)
+
+// ── Alert 條件（在 TradingView 的 Alert 視窗選擇） ────
+alertcondition(newUp,
+     "BB 突破上軌 (2/3 TF)",
+     "⬆ NAS100 價格同時突破 2 個時間框架布林帶上軌！1m={{close}}")
+
+alertcondition(newDown,
+     "BB 突破下軌 (2/3 TF)",
+     "⬇ NAS100 價格同時跌破 2 個時間框架布林帶下軌！1m={{close}}")
+
+alertcondition(newUp or newDown,
+     "BB 突破上/下軌 (2/3 TF)",
+     "⚡ NAS100 BB 多時間框架突破！1m={{close}}")
