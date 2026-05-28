@@ -1,0 +1,9 @@
+### US Stock Screener 2026-05-28
+### Criteria: Bullish EMA (5>10>20>50>200) | YTD >20% | Top-4 sectors
+
+###Technology
+MU  # YTD +188.6%  RSI 75
+ARM  # YTD +177.8%  RSI 76
+
+###Materials
+FCX  # YTD +21.6%  RSI 52
