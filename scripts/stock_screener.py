@@ -13,12 +13,6 @@ Run:
   python3 stock_screener.py --html                   # also save HTML report
 """
 
-import sys, io
-# Force UTF-8 output on Windows (avoids CP950 UnicodeEncodeError)
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
 import sys
 import json
 import argparse
@@ -289,25 +283,25 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     w = 72
     print()
-    print(bold(cyan("═" * w)))
+    print(bold(cyan("=" * w)))
     print(bold(cyan(f"  US STOCK DAILY SCREENER  |  {now}")))
-    print(bold(cyan("═" * w)))
+    print(bold(cyan("=" * w)))
 
     # Sector table
     print(bold("\n  SECTOR RANKING (YTD)"))
     for sector, gain in sector_ranking:
         is_lead = sector in leading_sectors
-        star  = "★" if is_lead else " "
+        star  = "*" if is_lead else " "
         g_str = (green if gain > 0 else lambda x: x)(f"{gain:+.1f}%")
         name  = bold(f"  {star} {sector}") if is_lead else f"    {sector}"
         print(f"{name:<30}  {g_str}")
 
     # Screened stocks
     count = len(results)
-    print(bold(f"\n  SCREENED STOCKS  —  {count} passed all filters"))
-    print(f"  ▸ Bullish EMA (5>10>20>50>200)  ▸ YTD >{cfg['ytd_min_pct']:.0f}%"
-          f"  ▸ Top-{cfg['top_sector_count']} sectors")
-    print("  " + "─" * (w - 2))
+    print(bold(f"\n  SCREENED STOCKS  -  {count} passed all filters"))
+    print(f"  > Bullish EMA (5>10>20>50>200)  > YTD >{cfg['ytd_min_pct']:.0f}%"
+          f"  > Top-{cfg['top_sector_count']} sectors")
+    print("  " + "-" * (w - 2))
 
     if not results:
         print(yellow("  No stocks passed all filters today."))
@@ -318,8 +312,8 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
             ytd_str = f"{s['ytd_pct']:+.1f}%"
             ema20   = s.get("ema20")
             vs_ema  = (f"+{(s['price'] - ema20) / ema20 * 100:.1f}%"
-                       if ema20 else "─")
-            rsi_str = f"{s['rsi14']:.0f}" if s["rsi14"] else "─"
+                       if ema20 else "-")
+            rsi_str = f"{s['rsi14']:.0f}" if s["rsi14"] else "-"
             rows.append([
                 i,
                 s["ticker"],
@@ -333,12 +327,12 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
         print(tabulate(rows, headers=headers, tablefmt="simple"))
 
     print()
-    print(bold(cyan("═" * w)))
+    print(bold(cyan("=" * w)))
     print("  Quick guide:")
-    print("    ▸ Focus on stocks with RSI 50–70 (momentum, not overbought)")
-    print("    ▸ Price > EMA20 by +3–8 % = healthy pullback entry zone")
-    print("    ▸ Validate with volume spike on breakout day")
-    print(bold(cyan("═" * w)))
+    print("    > Focus on stocks with RSI 50-70 (momentum, not overbought)")
+    print("    > Price > EMA20 by +3-8% = healthy pullback entry zone")
+    print("    > Validate with volume spike on breakout day")
+    print(bold(cyan("=" * w)))
     print()
 
 
