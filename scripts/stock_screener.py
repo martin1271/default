@@ -465,19 +465,13 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg, watchlist_fi
 def save_tradingview_watchlist(results: list, cfg: dict) -> "Path":
     """
     Export screened stocks as a TradingView-importable watchlist.
-    Format: ###Sector headers + one ticker per line.
-    Import in TV: Watchlist panel → ⋮ → Import watchlist → select this file.
+    Format: ###Sector group headers + one plain ticker per line (no comments).
+    Import in TV: Watchlist panel -> ... -> Import watchlist -> select this file.
     """
     today    = date.today().isoformat()
     out_dir  = Path(__file__).parent.parent / "data"
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / f"screener_{today}_watchlist.txt"
-
-    lines = [
-        f"### US Stock Screener {today}",
-        f"### Criteria: Bullish EMA (5>10>20>50>200) | YTD >{cfg['ytd_min_pct']:.0f}% | Top-{cfg['top_sector_count']} sectors",
-        "",
-    ]
 
     # Group by sector, keep original YTD-descending order within each group
     sectors_seen: list[str] = []
@@ -489,13 +483,11 @@ def save_tradingview_watchlist(results: list, cfg: dict) -> "Path":
             sectors_seen.append(sec)
         by_sector[sec].append(s)
 
+    lines: list[str] = []
     for sec in sectors_seen:
         lines.append(f"###{sec}")
         for s in by_sector[sec]:
-            ytd  = s["ytd_pct"]
-            rsi  = f"RSI {s['rsi14']:.0f}" if s["rsi14"] else ""
-            note = f"  # YTD {ytd:+.1f}%  {rsi}".rstrip()
-            lines.append(s["ticker"] + note)
+            lines.append(s["ticker"])   # plain ticker only — TV requirement
         lines.append("")
 
     out_path.write_text("\n".join(lines), encoding="utf-8")
