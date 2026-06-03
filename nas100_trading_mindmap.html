@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAS100 交易規則 Mind Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d1117;
+    font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+    color: #e6edf3;
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  h1.title {
+    text-align: center;
+    padding: 24px 0 8px;
+    font-size: 22px;
+    color: #58a6ff;
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  /* ── layout ── */
+  .map-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 10px 30px 40px;
+    gap: 10px;
+  }
+
+  /* ── center node ── */
+  .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 130px;
+    padding: 18px 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1f6feb 0%, #0d419d 100%);
+    border: 3px solid #58a6ff;
+    box-shadow: 0 0 30px #1f6feb88;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.5;
+    color: #fff;
+    position: relative;
+    z-index: 10;
+    align-self: center;
+    width: 130px;
+    height: 130px;
+  }
+
+  /* ── columns ── */
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 220px;
+    max-width: 260px;
+  }
+
+  /* ── cards ── */
+  .card {
+    border-radius: 12px;
+    padding: 12px 14px;
+    border-left: 4px solid;
+    background: #161b22;
+    box-shadow: 0 2px 8px #00000066;
+    transition: transform .15s;
+  }
+  .card:hover { transform: translateX(3px); }
+
+  .card h3 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card ul {
+    padding-left: 14px;
+    font-size: 12px;
+    color: #c9d1d9;
+    line-height: 1.8;
+  }
+  .card ul li { margin-bottom: 2px; }
+
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  /* colour themes */
+  .c-blue  { border-color: #58a6ff; }
+  .c-blue h3 { color: #58a6ff; }
+  .c-blue .tag { background: #1f6feb33; color: #58a6ff; }
+
+  .c-green { border-color: #3fb950; }
+  .c-green h3 { color: #3fb950; }
+  .c-green .tag { background: #23863633; color: #3fb950; }
+
+  .c-yellow { border-color: #d29922; }
+  .c-yellow h3 { color: #e3b341; }
+  .c-yellow .tag { background: #9e640044; color: #e3b341; }
+
+  .c-red { border-color: #f85149; }
+  .c-red h3 { color: #ff7b72; }
+  .c-red .tag { background: #da363333; color: #ff7b72; }
+
+  .c-purple { border-color: #bc8cff; }
+  .c-purple h3 { color: #d2a8ff; }
+  .c-purple .tag { background: #6e40c944; color: #d2a8ff; }
+
+  .c-orange { border-color: #f0883e; }
+  .c-orange h3 { color: #ffa657; }
+  .c-orange .tag { background: #bd561d44; color: #ffa657; }
+
+  .c-teal { border-color: #39d353; }
+  .c-teal h3 { color: #56d364; }
+
+  /* ── checklist box ── */
+  .checklist {
+    background: #0d1117;
+    border: 2px solid #d29922;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin: 12px auto 0;
+    max-width: 900px;
+  }
+  .checklist h3 {
+    color: #e3b341;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .check-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .check-item {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    color: #c9d1d9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .check-item::before {
+    content: "□";
+    color: #e3b341;
+    font-size: 14px;
+  }
+
+  /* ── forbidden box ── */
+  .forbidden {
+    background: #0d1117;
+    border: 2px solid #f85149;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin: 10px auto 0;
+    max-width: 900px;
+  }
+  .forbidden h3 {
+    color: #ff7b72;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .forbid-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .forbid-item {
+    background: #1c1010;
+    border: 1px solid #f8514944;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    color: #ffa198;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .forbid-item::before {
+    content: "✗";
+    color: #f85149;
+    font-weight: bold;
+  }
+
+  /* flow */
+  .flow {
+    background: #0d1117;
+    border: 2px solid #3fb950;
+    border-radius: 14px;
+    padding: 14px 24px;
+    margin: 10px auto 0;
+    max-width: 900px;
+  }
+  .flow h3 {
+    color: #3fb950;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .step {
+    background: #161b22;
+    border: 1px solid #3fb95066;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11.5px;
+    color: #c9d1d9;
+    text-align: center;
+    min-width: 90px;
+  }
+  .step strong { color: #56d364; display: block; font-size: 11px; margin-bottom: 2px; }
+  .arrow { color: #3fb95099; font-size: 16px; }
+
+  .footer-note {
+    text-align: center;
+    color: #484f58;
+    font-size: 11px;
+    margin-top: 20px;
+    padding-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="title">📊 NAS100 交易規則</h1>
+<p class="subtitle">最少 2 個訊號確認才入場 · 大納期專用</p>
+
+<!-- ══════════ MAIN MAP ══════════ -->
+<div class="map-wrap">
+
+  <!-- LEFT COL -->
+  <div class="col">
+
+    <div class="card c-blue">
+      <h3>⏱ 時間框架層次</h3>
+      <ul>
+        <li><strong>15分鐘</strong> — 判斷大方向</li>
+        <li><strong>5分鐘</strong> — 確認方向 + Squeeze</li>
+        <li><strong>1分鐘</strong> — 精確入場 / 出場</li>
+        <li>三圖方向一致優先</li>
+        <li>5/15一致，1分相反 → <span style="color:#ff7b72">唔做</span></li>
+      </ul>
+    </div>
+
+    <div class="card c-purple">
+      <h3>📐 Pattern 型態</h3>
+      <ul>
+        <li><strong>H Pattern</strong> — 尾部確認後入場</li>
+        <li><strong>N Pattern</strong> — 尾部突破/回測入場</li>
+        <li style="color:#ff7b72">⚠ 型態未完整 → 唔做</li>
+        <li style="color:#ff7b72">⚠ 唔好過早入場</li>
+      </ul>
+    </div>
+
+    <div class="card c-yellow">
+      <h3>📉 K線型態（5分鐘）</h3>
+      <ul>
+        <li>跌勢中出現 <strong>3根上影線</strong></li>
+        <li>可考慮做空</li>
+        <li style="color:#ff7b72">✗ 1分出現長藍K → 唔空</li>
+        <li style="color:#ff7b72">✗ 15分出現大陽燭 → 唔空</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">NAS100<br>交易<br>規則</div>
+
+  <!-- RIGHT COL -->
+  <div class="col">
+
+    <div class="card c-green">
+      <h3>🔵 Squeeze 指標</h3>
+      <ul>
+        <li>主要睇 <strong>5分鐘</strong> Squeeze</li>
+        <li>15分鐘作大方向確認</li>
+        <li>轉勢入場條件：</li>
+        <li>　Point值 <strong>&lt; 50</strong>，或</li>
+        <li>　明顯快將轉向</li>
+      </ul>
+    </div>
+
+    <div class="card c-orange">
+      <h3>📊 Bollinger Band</h3>
+      <ul>
+        <li>觸及 BOLL 外軌考慮反向</li>
+        <li>越多時間框架<strong>同時觸及</strong></li>
+        <li>→ 底部/頭部訊號越強</li>
+        <li style="color:#8b949e">例：1+5+15分同掂下軌</li>
+        <li style="color:#8b949e">→ 強烈做多訊號</li>
+      </ul>
+    </div>
+
+    <div class="card c-teal">
+      <h3>🐉 龍珠訊號</h3>
+      <ul>
+        <li><strong>1分出龍珠</strong> → 考慮反彈</li>
+        <li><strong>5分出龍珠</strong>（需三圖確認）</li>
+        <li>　藍珠 → 考慮多（EMA Cloud向上）</li>
+        <li>　紅珠 → 考慮空（EMA Cloud向下）</li>
+        <li><strong>15分出7粒龍珠</strong> → 耐心等多</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════ CHECKLIST ══════════ -->
+<div class="checklist">
+  <h3>✅ 入場前 Checklist（最少勾選 2 項）</h3>
+  <div class="check-grid">
+    <div class="check-item">5分 + 15分 方向一致</div>
+    <div class="check-item">Squeeze &lt; 50 或轉向確認</div>
+    <div class="check-item">BOLL 多圖同時觸及</div>
+    <div class="check-item">Pattern 尾部成形確認</div>
+    <div class="check-item">龍珠 + EMA Cloud 配合</div>
+    <div class="check-item">1分鐘方向一致</div>
+  </div>
+</div>
+
+<!-- ══════════ FORBIDDEN ══════════ -->
+<div class="forbidden">
+  <h3>🚫 禁止入場情況（Hard Rules）</h3>
+  <div class="forbid-grid">
+    <div class="forbid-item">一日睇唔到清晰勢</div>
+    <div class="forbid-item">5/15分一致，1分反向</div>
+    <div class="forbid-item">5分上影線想空 + 1分長藍</div>
+    <div class="forbid-item">5分上影線想空 + 15分大藍</div>
+    <div class="forbid-item">Pattern 未完整成形</div>
+    <div class="forbid-item">只有 1 個訊號確認</div>
+  </div>
+</div>
+
+<!-- ══════════ FLOW ══════════ -->
+<div class="flow">
+  <h3>🔄 入場操作流程</h3>
+  <div class="flow-steps">
+    <div class="step"><strong>第一步</strong>睇15分鐘<br>判斷大勢方向</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第二步</strong>睇5分鐘<br>確認方向+Squeeze</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第三步</strong>Pattern<br>是否成形中？</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第四步</strong>BOLL<br>多圖同時觸及？</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第五步</strong>龍珠訊號<br>EMA Cloud配合？</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第六步</strong>Checklist<br>≥ 2項✓</div>
+    <span class="arrow">→</span>
+    <div class="step"><strong>第七步</strong>1分鐘<br>配合後入場</div>
+  </div>
+</div>
+
+<p class="footer-note">NAS100 CFD · Pepperstone · Ripster EMA Cloud + BB20 + Squeeze20</p>
+
+</body>
+</html>
