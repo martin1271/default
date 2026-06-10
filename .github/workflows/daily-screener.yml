@@ -1,0 +1,39 @@
+name: Daily Stock Screener
+
+on:
+  schedule:
+    # 每週一至五 21:30 UTC 執行 (約美東收盤後 1-1.5 小時,夏令 17:30 ET)
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r screener/requirements.txt
+
+      - name: Run screener
+        run: python screener/daily_screener.py
+
+      - name: Commit report
+        run: |
+          git config user.name "screener-bot"
+          git config user.email "actions@github.com"
+          git add reports/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Daily screener report $(date -u +%F)"
+            git push
+          fi
