@@ -43,6 +43,9 @@ DEFAULTS = {
     "volume_avg_days":    20,
     "min_price":          5.0,    # exclude penny stocks
     "min_avg_volume": 500_000,    # exclude illiquid names
+    "discovery":         True,    # auto-discover top momentum stocks market-wide
+    "discovery_min_mcap": 2e9,    # discovery: min market cap ($2B)
+    "discovery_size":    250,     # discovery: how many top movers to pull
 }
 
 # Sector ETFs for YTD ranking
@@ -67,6 +70,9 @@ SECTOR_STOCKS = {
         "KLAC","MU","SNPS","CDNS","ADI","MRVL","FTNT","PANW","CRWD","ZS",
         "NOW","PLTR","ADBE","CRM","INTU","SNOW","NET","DDOG","MDB","NTNX",
         "SMCI","ARM","DELL","PSTG","WDAY","VEEV","HUBS","BILL","GTLB","APP",
+        # Storage / memory / AI hardware
+        "SNDK","WDC","STX","ANET","VRT","COHR","CLS","MPWR","TER","ONTO",
+        "CRDO","ALAB","APH","GFS","MCHP","SWKS","QRVO","ENPH","FSLR","AEHR",
     ],
     "Healthcare": [
         "LLY","UNH","JNJ","ABBV","MRK","TMO","DHR","ABT","ISRG","SYK",
@@ -179,14 +185,56 @@ def rank_sectors(cfg: dict) -> list[tuple[str, float]]:
     return sorted(results, key=lambda x: x[1], reverse=True)
 
 
-def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
-    candidates = []
-    for sector in leading_sectors:
-        candidates.extend(SECTOR_STOCKS.get(sector, []))
-    candidates = list(dict.fromkeys(candidates))  # deduplicate, keep order
+def discover_momentum_stocks(cfg: dict) -> dict[str, str]:
+    """
+    Market-wide discovery: query Yahoo's equity screener for the top
+    52-week performers above a market-cap floor. This catches rising
+    "stock kings" (e.g. SNDK) that are not in the static sector lists.
+    Returns {ticker: sector_label}.
+    """
+    try:
+        from yfinance import EquityQuery
+        q = EquityQuery("and", [
+            EquityQuery("eq", ["region", "us"]),
+            EquityQuery("gt", ["intradaymarketcap", cfg["discovery_min_mcap"]]),
+            EquityQuery("gt", ["intradayprice", cfg["min_price"]]),
+        ])
+        resp = yf.screen(
+            q,
+            sortField="fiftytwowkpercentchange",
+            sortAsc=False,
+            size=cfg["discovery_size"],
+        )
+        quotes = resp.get("quotes", []) if isinstance(resp, dict) else []
+        discovered = {}
+        for item in quotes:
+            sym = item.get("symbol", "")
+            if not sym or "." in sym or "=" in sym or "^" in sym:
+                continue  # skip non-common-stock symbols
+            sector = item.get("sector") or "Momentum"
+            discovered[sym] = sector
+        print(f"  Discovery: found {len(discovered)} top 52-week movers market-wide")
+        return discovered
+    except Exception as exc:
+        print(f"  Discovery unavailable ({exc}); using static lists only")
+        return {}
 
+
+def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
+    # Static universe: stocks in leading sectors
+    candidate_map: dict[str, str] = {}
+    for sector in leading_sectors:
+        for t in SECTOR_STOCKS.get(sector, []):
+            candidate_map.setdefault(t, sector)
+
+    # Dynamic universe: market-wide top momentum names (any sector)
+    if cfg.get("discovery"):
+        for t, sec in discover_momentum_stocks(cfg).items():
+            candidate_map.setdefault(t, sec)
+
+    candidates = list(candidate_map.keys())
     total = len(candidates)
-    print(f"  Scanning {total} stocks in {len(leading_sectors)} leading sectors...")
+    print(f"  Scanning {total} stocks ({len(leading_sectors)} leading sectors + discovery)...")
 
     hist_start  = f"{date.today().year - 1}-01-01"  # need ~1 year for EMA200
     ytd_start   = ytd_start_str()
@@ -247,10 +295,7 @@ def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
                 if not is_bullish:
                     continue
 
-                sector = next(
-                    (s for s in leading_sectors if ticker in SECTOR_STOCKS.get(s, [])),
-                    "Unknown",
-                )
+                sector = candidate_map.get(ticker, "Unknown")
 
                 # ── RSI14 (bonus context) ─────────────────────────
                 delta  = closes.diff()
@@ -526,6 +571,8 @@ def parse_args():
                    help="Also save an HTML report (open in browser)")
     p.add_argument("--min-vol", type=int,   default=DEFAULTS["min_avg_volume"],
                    help="Min avg daily volume (default 500000)")
+    p.add_argument("--no-discovery", action="store_true",
+                   help="Disable market-wide momentum discovery (static lists only)")
     return p.parse_args()
 
 
@@ -534,7 +581,8 @@ def main():
     cfg  = {**DEFAULTS,
             "ytd_min_pct":     args.ytd,
             "top_sector_count": args.sectors,
-            "min_avg_volume":  args.min_vol}
+            "min_avg_volume":  args.min_vol,
+            "discovery":       not args.no_discovery}
 
     print(bold("\n  US Stock Screener"))
     print(f"  YTD >{cfg['ytd_min_pct']:.0f}%  |  Top-{cfg['top_sector_count']} sectors"
