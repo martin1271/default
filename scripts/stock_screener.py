@@ -45,8 +45,8 @@ DEFAULTS = {
     "volume_avg_days":    20,
     "min_price":           5.0,  # exclude penny stocks
     "min_avg_volume": 500_000,   # exclude illiquid names
+    "min_mcap":            5e9,  # min market cap $5B (SNDK was ~$7B when its run began)
     "discovery":          True,  # auto-discover top momentum stocks market-wide
-    "discovery_min_mcap":  2e9,  # discovery: min market cap ($2B)
     "discovery_size":     250,   # discovery: how many top movers to pull
 }
 
@@ -226,7 +226,7 @@ def discover_momentum_stocks(cfg: dict) -> dict[str, str]:
         from yfinance import EquityQuery
         q = EquityQuery("and", [
             EquityQuery("eq", ["region", "us"]),
-            EquityQuery("gt", ["intradaymarketcap", cfg["discovery_min_mcap"]]),
+            EquityQuery("gt", ["intradaymarketcap", cfg["min_mcap"]]),
             EquityQuery("gt", ["intradayprice", cfg["min_price"]]),
         ])
         resp = yf.screen(
@@ -362,6 +362,42 @@ def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
     return sorted(results, key=lambda x: x["ytd_pct"], reverse=True)
 
 
+def filter_by_market_cap(results: list[dict], cfg: dict) -> list[dict]:
+    """
+    Drop stocks below the market-cap floor. Runs after all other filters
+    so we only fetch mcap for the small set of survivors (fast).
+    Stocks with unavailable mcap data are kept (benefit of the doubt).
+    """
+    floor = cfg.get("min_mcap", 0)
+    if not results or floor <= 0:
+        return results
+
+    kept = []
+    for s in results:
+        mcap = None
+        try:
+            mcap = yf.Ticker(s["ticker"]).fast_info.get("marketCap")
+        except Exception:
+            pass
+        s["mcap"] = mcap
+        if mcap is not None and mcap < floor:
+            continue
+        kept.append(s)
+
+    dropped = len(results) - len(kept)
+    if dropped:
+        print(f"  Market-cap filter: removed {dropped} stocks below ${floor/1e9:.0f}B")
+    return kept
+
+
+def fmt_mcap(v) -> str:
+    if v is None:
+        return "-"
+    if v >= 1e12:
+        return f"{v/1e12:.2f}T"
+    return f"{v/1e9:.1f}B"
+
+
 # ── Reports ────────────────────────────────────────────────────────────────────
 
 def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
@@ -392,7 +428,7 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
     if not results:
         print(yellow("  No stocks passed all filters today."))
     else:
-        headers = ["#", "Ticker", "Price", "YTD %", "52wk %", "RSI", "Sector", "Avg Vol"]
+        headers = ["#", "Ticker", "Price", "YTD %", "52wk %", "RSI", "MCap", "Sector", "Avg Vol"]
         rows = []
         for i, s in enumerate(results, 1):
             ytd_str = f"{s['ytd_pct']:+.1f}%"
@@ -406,6 +442,7 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
                 ytd_str,
                 w52_str,
                 rsi_str,
+                fmt_mcap(s.get("mcap")),
                 s["sector"][:16],
                 fmt_volume(s["avg_vol"]),
             ])
@@ -479,7 +516,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <table>
   <tr>
     <th>#</th><th>Ticker</th><th>Price</th><th>YTD %</th><th>52wk %</th>
-    <th>RSI 14</th><th>Sector</th><th>Avg Vol</th>
+    <th>RSI 14</th><th>MCap</th><th>Sector</th><th>Avg Vol</th>
     <th>vs EMA20</th><th>EMA50</th><th>EMA200</th>
   </tr>
   {stock_rows}
@@ -519,6 +556,7 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg, watchlist_fi
             f'<td class="up">{s["ytd_pct"]:+.1f}%</td>'
             f'<td class="up">{w52_str}</td>'
             f'<td>{rsi_str}</td>'
+            f'<td>{fmt_mcap(s.get("mcap"))}</td>'
             f'<td>{s["sector"]}</td>'
             f'<td>{fmt_volume(s["avg_vol"])}</td>'
             f'<td>{vs_ema}</td>'
@@ -612,6 +650,8 @@ def parse_args():
                    help="Min avg daily volume (default 500000)")
     p.add_argument("--no-discovery", action="store_true",
                    help="Disable market-wide momentum discovery (static lists only)")
+    p.add_argument("--min-mcap", type=float, default=DEFAULTS["min_mcap"] / 1e9,
+                   help="Min market cap in $billions (default 5)")
     return p.parse_args()
 
 
@@ -621,6 +661,7 @@ def main():
             "ytd_min_pct":     args.ytd,
             "top_sector_count": args.sectors,
             "min_avg_volume":  args.min_vol,
+            "min_mcap":        args.min_mcap * 1e9,
             "discovery":       not args.no_discovery}
 
     # Compute today's scaled YTD threshold once and inject into cfg
@@ -643,6 +684,7 @@ def main():
     # Step 2 – screen stocks
     print(bold(f"\n  [2/3] Screening stocks  (leading: {', '.join(leading_sectors)})"))
     results = screen_stocks(leading_sectors, cfg)
+    results = filter_by_market_cap(results, cfg)
 
     # Step 3 – output
     print(bold(f"\n  [3/3] Generating report  ({len(results)} passed)\n"))
