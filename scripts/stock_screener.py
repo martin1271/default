@@ -37,15 +37,17 @@ except ImportError as e:
 # ── Default configuration ──────────────────────────────────────────────────────
 
 DEFAULTS = {
-    "ytd_min_pct":       20.0,   # min YTD gain %
-    "top_sector_count":   4,      # leading sectors to include
+    "ytd_min_pct":        20.0,  # full-year YTD target (scales down early in year)
+    "ytd_floor_pct":       5.0,  # minimum threshold in Jan (never goes below this)
+    "w52_min_pct":        40.0,  # alternative: qualify via 52-week gain (OR logic)
+    "top_sector_count":    4,    # leading sectors to include
     "ema_periods":       [5, 10, 20, 50, 200],
     "volume_avg_days":    20,
-    "min_price":          5.0,    # exclude penny stocks
-    "min_avg_volume": 500_000,    # exclude illiquid names
-    "discovery":         True,    # auto-discover top momentum stocks market-wide
-    "discovery_min_mcap": 2e9,    # discovery: min market cap ($2B)
-    "discovery_size":    250,     # discovery: how many top movers to pull
+    "min_price":           5.0,  # exclude penny stocks
+    "min_avg_volume": 500_000,   # exclude illiquid names
+    "discovery":          True,  # auto-discover top momentum stocks market-wide
+    "discovery_min_mcap":  2e9,  # discovery: min market cap ($2B)
+    "discovery_size":     250,   # discovery: how many top movers to pull
 }
 
 # Sector ETFs for YTD ranking
@@ -124,6 +126,34 @@ SECTOR_STOCKS = {
 
 def ytd_start_str() -> str:
     return f"{date.today().year}-01-01"
+
+
+def dynamic_ytd_threshold(cfg: dict) -> float:
+    """
+    Scale the YTD minimum proportionally to how far through the year we are.
+    Jan 1  → ytd_floor_pct  (e.g. 5%)
+    Dec 31 → ytd_min_pct    (e.g. 20%)
+    Uses trading-day count for accuracy.
+    """
+    today     = date.today()
+    year_start = date(today.year, 1, 1)
+    year_end   = date(today.year, 12, 31)
+
+    def _trading_days(d1, d2):
+        days = 0
+        cur  = d1
+        while cur <= d2:
+            if cur.weekday() < 5:   # Mon–Fri only
+                days += 1
+            cur = date.fromordinal(cur.toordinal() + 1)
+        return max(days, 1)
+
+    elapsed  = _trading_days(year_start, today)
+    total    = _trading_days(year_start, year_end)
+    fraction = elapsed / total
+    floor    = cfg["ytd_floor_pct"]
+    target   = cfg["ytd_min_pct"]
+    return round(floor + (target - floor) * fraction, 1)
 
 
 def pct_change(new_val: float, old_val: float) -> float:
@@ -273,13 +303,19 @@ def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
                 if current_price < cfg["min_price"]:
                     continue
 
-                # ── YTD gain ──────────────────────────────────────
+                # ── YTD gain (dynamic threshold) ──────────────────
                 ytd_slice = closes[closes.index >= ytd_start]
                 if ytd_slice.empty:
                     continue
-                ytd_gain = pct_change(current_price, float(ytd_slice.iloc[0]))
-                if ytd_gain < cfg["ytd_min_pct"]:
-                    continue
+                ytd_gain     = pct_change(current_price, float(ytd_slice.iloc[0]))
+                ytd_required = cfg["_ytd_threshold"]   # pre-computed dynamic value
+
+                # ── 52-week gain (OR qualifier) ────────────────────
+                w52_gain = pct_change(current_price, float(closes.iloc[-252])) \
+                           if len(closes) >= 252 else ytd_gain
+
+                if ytd_gain < ytd_required and w52_gain < cfg["w52_min_pct"]:
+                    continue   # must pass at least one of the two momentum tests
 
                 # ── Volume filter ─────────────────────────────────
                 avg_vol = None
@@ -308,6 +344,7 @@ def screen_stocks(leading_sectors: list[str], cfg: dict) -> list[dict]:
                     "ticker":   ticker,
                     "price":    round(current_price, 2),
                     "ytd_pct":  round(ytd_gain, 2),
+                    "w52_pct":  round(w52_gain, 2),
                     "rsi14":    round(rsi14, 1) if rsi14 else None,
                     "sector":   sector,
                     "avg_vol":  avg_vol,
@@ -345,32 +382,32 @@ def print_terminal_report(sector_ranking, leading_sectors, results, cfg):
         print(f"{name:<30}  {g_str}")
 
     # Screened stocks
-    count = len(results)
+    count       = len(results)
+    ytd_thresh  = cfg.get("_ytd_threshold", cfg["ytd_min_pct"])
     print(bold(f"\n  SCREENED STOCKS  -  {count} passed all filters"))
-    print(f"  > Bullish EMA (5>10>20>50>200)  > YTD >{cfg['ytd_min_pct']:.0f}%"
-          f"  > Top-{cfg['top_sector_count']} sectors")
+    print(f"  > Bullish EMA (5>10>20>50>200)")
+    print(f"  > YTD >={ytd_thresh:.1f}% (today)  OR  52-wk >{cfg['w52_min_pct']:.0f}%")
     print("  " + "-" * (w - 2))
 
     if not results:
         print(yellow("  No stocks passed all filters today."))
     else:
-        headers = ["#", "Ticker", "Price", "YTD %", "RSI", "Sector", "Avg Vol", "vs EMA20"]
+        headers = ["#", "Ticker", "Price", "YTD %", "52wk %", "RSI", "Sector", "Avg Vol"]
         rows = []
         for i, s in enumerate(results, 1):
             ytd_str = f"{s['ytd_pct']:+.1f}%"
+            w52_str = f"{s.get('w52_pct', 0):+.1f}%"
             ema20   = s.get("ema20")
-            vs_ema  = (f"+{(s['price'] - ema20) / ema20 * 100:.1f}%"
-                       if ema20 else "-")
             rsi_str = f"{s['rsi14']:.0f}" if s["rsi14"] else "-"
             rows.append([
                 i,
                 s["ticker"],
                 f"${s['price']:.2f}",
                 ytd_str,
+                w52_str,
                 rsi_str,
                 s["sector"][:16],
                 fmt_volume(s["avg_vol"]),
-                vs_ema,
             ])
         print(tabulate(rows, headers=headers, tablefmt="simple"))
 
@@ -441,7 +478,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <h2>Screened Stocks</h2>
 <table>
   <tr>
-    <th>#</th><th>Ticker</th><th>Price</th><th>YTD %</th>
+    <th>#</th><th>Ticker</th><th>Price</th><th>YTD %</th><th>52wk %</th>
     <th>RSI 14</th><th>Sector</th><th>Avg Vol</th>
     <th>vs EMA20</th><th>EMA50</th><th>EMA200</th>
   </tr>
@@ -473,12 +510,14 @@ def save_html_report(sector_ranking, leading_sectors, results, cfg, watchlist_fi
         rsi_str  = f"{s['rsi14']:.0f}" if s["rsi14"] else "─"
         ema50_str  = f"{s['ema50']:.2f}"  if s["ema50"]  else "─"
         ema200_str = f"{s['ema200']:.2f}" if s["ema200"] else "─"
+        w52_str  = f"{s.get('w52_pct', 0):+.1f}%"
         stock_rows_html += (
             f'<tr>'
             f'<td>{i}</td>'
             f'<td class="ticker">{s["ticker"]}</td>'
             f'<td>${s["price"]:.2f}</td>'
             f'<td class="up">{s["ytd_pct"]:+.1f}%</td>'
+            f'<td class="up">{w52_str}</td>'
             f'<td>{rsi_str}</td>'
             f'<td>{s["sector"]}</td>'
             f'<td>{fmt_volume(s["avg_vol"])}</td>'
@@ -584,9 +623,14 @@ def main():
             "min_avg_volume":  args.min_vol,
             "discovery":       not args.no_discovery}
 
+    # Compute today's scaled YTD threshold once and inject into cfg
+    ytd_threshold = dynamic_ytd_threshold(cfg)
+    cfg["_ytd_threshold"] = ytd_threshold
+
     print(bold("\n  US Stock Screener"))
-    print(f"  YTD >{cfg['ytd_min_pct']:.0f}%  |  Top-{cfg['top_sector_count']} sectors"
-          f"  |  Bullish EMA alignment\n")
+    print(f"  YTD today >={ytd_threshold:.1f}%  (target {cfg['ytd_min_pct']:.0f}% by year-end)"
+          f"  OR  52-wk >{cfg['w52_min_pct']:.0f}%")
+    print(f"  Top-{cfg['top_sector_count']} sectors  |  Bullish EMA alignment\n")
 
     # Step 1 – rank sectors
     print(bold("  [1/3] Ranking sectors"))
