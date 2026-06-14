@@ -55,7 +55,13 @@ CLOSE_MIN  = 22 * 60 + 15    # 每日結束 22:15
 INTERVAL   = 30              # 時間間隔 (分鐘)。選 30 分鐘：9:45~22:15 剛好 25 格，清晰好用。
 DEFAULT_MIN_STAFF = 1        # 每個時段預設最低人手
 
-EMPLOYEES = ["菁", "Kerry", "Ice", "Brielle"]   # 預設員工名單 (可在 Settings 改)
+EMPLOYEES = ["菁", "Kerry", "Ice", "Brielle", "琳琳"]   # 預設員工名單 (可在 Settings 改)
+
+# 長短週 (全職員工)：一週 40 (短週)、一週 48 (長週)，兩週平均 44。
+WEEK_LONG_HOURS  = 48
+WEEK_SHORT_HOURS = 40
+DEFAULT_WEEK_TYPE = "長週"            # 本週預設類型 (可在 Settings 切換)
+DEFAULT_EMP_TYPE  = "全職"            # 預設員工類型
 
 # 七天 (這個字串是所有頁面的「對應鍵」，必須完全一致)
 DAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
@@ -68,7 +74,7 @@ OUTPUT = "排更表_Roster.xlsx"
 # 2. 顏色 / 樣式
 # ===========================================================================
 # 每位員工一個代表色 (與下方狀態色刻意分開，避免混淆)
-EMP_COLORS = ["9DC3E6", "FFD966", "B4A7D6", "F4B6C2"]  # 藍 / 琥珀 / 紫 / 粉
+EMP_COLORS = ["9DC3E6", "FFD966", "B4A7D6", "F4B6C2", "76D7C4"]  # 藍 / 琥珀 / 紫 / 粉 / 青
 
 # 狀態色
 C_NOCOVER   = "FF9999"  # 紅：無人覆蓋
@@ -163,6 +169,16 @@ APPLIES = ["全部", "平日", "週末"] + DAYS
 for i, a in enumerate(APPLIES):
     ws_list.cell(row=2 + i, column=9, value=a)
 
+ws_list["K1"] = "員工類型"
+for i, t in enumerate(["全職", "兼職"]):
+    ws_list.cell(row=2 + i, column=11, value=t)        # K2:K3
+
+ws_list["M1"] = "本週類型"
+for i, t in enumerate(["長週", "短週"]):
+    ws_list.cell(row=2 + i, column=13, value=t)        # M2:M3
+TYPE_RANGE     = f"{S_LST}!$K$2:$K$3"
+WEEKTYPE_RANGE = f"{S_LST}!$M$2:$M$3"
+
 # 定義名稱 (Defined Names)，讓跨頁下拉選單更穩定
 from openpyxl.workbook.defined_name import DefinedName
 def add_name(name, ref):
@@ -196,15 +212,24 @@ ws_set.merge_cells("A1:E1")
 section_title(ws_set, "A3", "① 員工名單 (可改名 / 即時生效)")
 ws_set["A4"] = "員工"
 ws_set["B4"] = "代表色"
-ws_set["A4"].font = ws_set["B4"].font = Font(bold=True)
-EMP_NAME_ROW0 = 5          # 員工名稱由 B5 開始 -> B5..B8
+ws_set["C4"] = "類型"
+ws_set["D4"] = "每週目標時數"
+for cc in "ABCD":
+    ws_set[f"{cc}4"].font = Font(bold=True)
+EMP_NAME_ROW0 = 5          # 員工名稱由 A5 開始
 for k, (name, color) in enumerate(zip(EMPLOYEES, EMP_COLORS)):
     r = EMP_NAME_ROW0 + k
     ws_set.cell(row=r, column=1, value=name)               # A5.. 名稱 (可改)
     swatch = ws_set.cell(row=r, column=2, value="")        # B5.. 顏色示意
     swatch.fill = fill(color)
     swatch.border = BORDER
-EMP_NAME_REF = [f"{S_SET}!$A${EMP_NAME_ROW0 + k}" for k in range(len(EMPLOYEES))]
+    ws_set.cell(row=r, column=3, value=DEFAULT_EMP_TYPE)   # C5.. 類型 (全職/兼職)
+    ws_set.cell(row=r, column=4, value=None)               # D5.. 目標時數 (兼職填；全職留空=用長短週)
+    ws_set.cell(row=r, column=3).border = BORDER
+    ws_set.cell(row=r, column=4).border = BORDER
+EMP_NAME_REF   = [f"{S_SET}!$A${EMP_NAME_ROW0 + k}" for k in range(len(EMPLOYEES))]
+EMP_TYPE_REF   = [f"{S_SET}!$C${EMP_NAME_ROW0 + k}" for k in range(len(EMPLOYEES))]
+EMP_TARGET_REF = [f"{S_SET}!$D${EMP_NAME_ROW0 + k}" for k in range(len(EMPLOYEES))]
 
 # --- 營業時間 (改這裡要重跑程式) ---
 section_title(ws_set, "A11", "② 營業 / 排班時間 (改後需重跑 Python 程式)")
@@ -253,6 +278,25 @@ RULE_FROM  = [f"{S_SET}!$B${RULE_ROW0 + i}" for i in range(N_RULES)]
 RULE_TO    = [f"{S_SET}!$C${RULE_ROW0 + i}" for i in range(N_RULES)]
 RULE_MIN   = [f"{S_SET}!$D${RULE_ROW0 + i}" for i in range(N_RULES)]
 
+# --- 長短週 / 全職目標時數 (即時生效) ---
+WK_SEC = RULE_ROW0 + N_RULES + 1                # 規則之後留一列再開新段
+section_title(ws_set, f"A{WK_SEC}", "⑤ 長短週設定 (全職：短週 40、長週 48，平均 44)")
+ws_set.cell(row=WK_SEC + 1, column=1, value="本週類型")
+ws_set.cell(row=WK_SEC + 1, column=2, value=DEFAULT_WEEK_TYPE)
+ws_set.cell(row=WK_SEC + 2, column=1, value="長週目標時數")
+ws_set.cell(row=WK_SEC + 2, column=2, value=WEEK_LONG_HOURS)
+ws_set.cell(row=WK_SEC + 3, column=1, value="短週目標時數")
+ws_set.cell(row=WK_SEC + 3, column=2, value=WEEK_SHORT_HOURS)
+ws_set.cell(row=WK_SEC + 4, column=1, value="兩週平均 (參考)")
+avg_cell = ws_set.cell(row=WK_SEC + 4, column=2,
+                       value=f"=(B{WK_SEC + 2}+B{WK_SEC + 3})/2")
+avg_cell.number_format = HOUR_FMT
+WEEKTYPE_REF  = f"{S_SET}!$B${WK_SEC + 1}"
+LONG_REF      = f"{S_SET}!$B${WK_SEC + 2}"
+SHORT_REF     = f"{S_SET}!$B${WK_SEC + 3}"
+# 本週全職目標時數 = 視乎長/短週
+WEEK_HOURS_EXPR = f'IF({WEEKTYPE_REF}="長週",{LONG_REF},{SHORT_REF})'
+
 # Settings 的下拉選單 (直接用「頁!範圍」最穩定，Excel/LibreOffice 都支援)
 TIME_RANGE = f"{S_LST}!$A$2:$A${1 + len(BOUNDARIES)}"
 APPLIES_RANGE = f"{S_LST}!$I$2:$I${1 + len(APPLIES)}"
@@ -268,6 +312,13 @@ dv_time_set.add("B12"); dv_time_set.add("B13")
 dv_time_rules = DataValidation(type="list", formula1=TIME_RANGE, allow_blank=True)
 ws_set.add_data_validation(dv_time_rules)
 dv_time_rules.add(f"B{RULE_ROW0}:C{RULE_ROW0 + N_RULES - 1}")
+# 員工類型 (全職/兼職) 與 本週類型 (長週/短週) 下拉
+dv_type = DataValidation(type="list", formula1=TYPE_RANGE, allow_blank=False)
+ws_set.add_data_validation(dv_type)
+dv_type.add(f"C{EMP_NAME_ROW0}:C{EMP_NAME_ROW0 + len(EMPLOYEES) - 1}")
+dv_wktype = DataValidation(type="list", formula1=WEEKTYPE_RANGE, allow_blank=False)
+ws_set.add_data_validation(dv_wktype)
+dv_wktype.add(f"B{WK_SEC + 1}")
 
 for col, w in {"A": 22, "B": 14, "C": 14, "D": 12, "E": 12}.items():
     ws_set.column_dimensions[col].width = w
@@ -309,6 +360,7 @@ demo = {
     "Brielle": {"星期一": (time(16, 0), time(22, 15), None, None),
                 "星期二": (time(16, 0), time(22, 15), None, None),
                 "星期日": (time(9, 45), time(22, 15), time(14, 0), time(15, 0))},
+    "琳琳":    {d: (time(12, 0), time(21, 0), time(16, 0), time(16, 45)) for d in DAYS[2:7]},
 }
 
 row = IN_ROW0
@@ -512,22 +564,30 @@ ws_sch.freeze_panes = "B5"
 ws_sum["A1"] = "Summary 總覽 Dashboard"
 ws_sum["A1"].font = Font(bold=True, size=14, color="FFFFFF")
 ws_sum["A1"].fill = fill(C_TITLE)
-ws_sum.merge_cells("A1:I1")
+ws_sum.merge_cells("A1:M1")
 
-# (1) 員工每日 / 每週時數
-ws_sum["A3"] = "① 員工工時 (每日 / 每週)"
+# (1) 員工每日 / 每週時數 + 長短週目標達成
+ws_sum["A3"] = "① 員工工時 (每日 / 每週) 與長短週目標達成"
 ws_sum["A3"].font = Font(bold=True, size=12, color=C_TITLE); ws_sum["A3"].fill = fill(C_SECTION)
-ws_sum.merge_cells("A3:I3")
+ws_sum.merge_cells("A3:M3")
 hdr_row = 4
 ws_sum.cell(row=hdr_row, column=1, value="員工").font = hdr_font()
 ws_sum.cell(row=hdr_row, column=1).fill = fill(C_HDR)
 for j, d in enumerate(DAYS):
     c = ws_sum.cell(row=hdr_row, column=2 + j, value=d)
     c.font = hdr_font(); c.fill = fill(C_HDR_WKND if d in WEEKEND else C_HDR); c.alignment = CENTER
-tot_col = 2 + len(DAYS)
-ws_sum.cell(row=hdr_row, column=tot_col, value="每週總計").font = hdr_font()
-ws_sum.cell(row=hdr_row, column=tot_col).fill = fill(C_HDR)
+tot_col  = 2 + len(DAYS)             # 每週總計
+type_col = tot_col + 1               # 類型
+tgt_col  = tot_col + 2               # 目標時數
+diff_col = tot_col + 3               # 差異 (實際-目標)
+stat_col = tot_col + 4               # 達標狀態
+for col, lab in [(tot_col, "每週總計"), (type_col, "類型"),
+                 (tgt_col, "目標時數"), (diff_col, "差異"), (stat_col, "達標")]:
+    c = ws_sum.cell(row=hdr_row, column=col, value=lab)
+    c.font = hdr_font(); c.fill = fill(C_HDR); c.alignment = CENTER
 
+tot_L  = get_column_letter(tot_col)
+tgt_L  = get_column_letter(tgt_col)
 emp_row0 = hdr_row + 1
 for k, emp in enumerate(EMPLOYEES):
     r = emp_row0 + k
@@ -542,8 +602,34 @@ for k, emp in enumerate(EMPLOYEES):
     ws_sum.cell(row=r, column=tot_col).font = Font(bold=True)
     ws_sum.cell(row=r, column=1).border = BORDER
     ws_sum.cell(row=r, column=tot_col).border = BORDER
+    # 類型 (跟 Settings)
+    ws_sum.cell(row=r, column=type_col, value=f"={EMP_TYPE_REF[k]}").alignment = CENTER
+    # 目標時數：全職用本週長/短週 (除非自填覆寫)；兼職用自填最低時數
+    tgt_formula = (f'=IF({EMP_TYPE_REF[k]}="全職",'
+                   f'IF({EMP_TARGET_REF[k]}="",{WEEK_HOURS_EXPR},{EMP_TARGET_REF[k]}),'
+                   f'{EMP_TARGET_REF[k]})')
+    ct = ws_sum.cell(row=r, column=tgt_col, value=tgt_formula)
+    ct.number_format = HOUR_FMT; ct.alignment = CENTER
+    # 差異 = 實際 - 目標
+    cd = ws_sum.cell(row=r, column=diff_col, value=f"={tot_L}{r}-{tgt_L}{r}")
+    cd.number_format = "+0.00;-0.00"; cd.alignment = CENTER
+    # 達標狀態
+    cs = ws_sum.cell(row=r, column=stat_col,
+                     value=f'=IF({tgt_L}{r}=0,"-",IF({tot_L}{r}>={tgt_L}{r},"達標","不足"))')
+    cs.alignment = CENTER
+    for col in (type_col, tgt_col, diff_col, stat_col):
+        ws_sum.cell(row=r, column=col).border = BORDER
 
 emp_last = emp_row0 + len(EMPLOYEES) - 1
+# 差異著色：有目標且未達 -> 橙；達標 -> 綠
+diff_L = get_column_letter(diff_col)
+diff_rng = f"{diff_L}{emp_row0}:{diff_L}{emp_last}"
+ws_sum.conditional_formatting.add(
+    diff_rng, FormulaRule(formula=[f"AND({tgt_L}{emp_row0}>0,{diff_L}{emp_row0}<0)"],
+                          fill=fill(C_UNDER), stopIfTrue=True))
+ws_sum.conditional_formatting.add(
+    diff_rng, FormulaRule(formula=[f"AND({tgt_L}{emp_row0}>0,{diff_L}{emp_row0}>=0)"],
+                          fill=fill(C_OK)))
 tot_letter = get_column_letter(tot_col)
 week_rng = f"{tot_letter}{emp_row0}:{tot_letter}{emp_last}"
 name_rng = f"A{emp_row0}:A{emp_last}"
@@ -633,7 +719,7 @@ ws_sum.conditional_formatting.add(
     CellIsRule(operator="greaterThan", formula=["0"], fill=fill(C_ERR)))
 
 ws_sum.column_dimensions["A"].width = 16
-for cl in "BCDEFGHI":
+for cl in "BCDEFGHIJKLM":
     ws_sum.column_dimensions[cl].width = 12
 
 
@@ -667,14 +753,21 @@ lines = [
     ("步驟", "『設定 Settings』③ 設預設最低人手；④ 加特別規則 (例：午市 12:00-14:00 需 2 人)。"),
     ("適用對象", "可選『全部 / 平日 / 週末 / 某一天』。多條規則重疊時取最高要求。"),
     ("", ""),
-    ("⑤ 如何看錯誤與顏色提示", ""),
+    ("⑤ 長短週與目標時數", ""),
+    ("員工類型", "『設定 Settings』① 每位員工可設『全職 / 兼職』。全職可留空『每週目標時數』。"),
+    ("長短週", "『設定 Settings』⑤ 切換『本週類型』長週(48)或短週(40)，兩週平均 44 小時。"),
+    ("全職目標", "全職員工本週目標 = 長/短週時數 (除非在『每週目標時數』自填覆寫)。"),
+    ("兼職目標", "兼職員工在『每週目標時數』填最低時數即可。"),
+    ("達標檢視", "Summary ① 的『目標時數 / 差異 / 達標』欄會顯示是否達標 (橙=不足、綠=達標)。"),
+    ("", ""),
+    ("⑥ 如何看錯誤與顏色提示", ""),
     ("輸入頁", "『檢查/錯誤提示』欄會用紅底標示：下班早於上班、飯鐘超時、超出營業時間等。"),
     ("主排更表", "紅=無人覆蓋；橙=人手不足；淺綠=正常；灰=飯鐘。每格數字是當值人數。"),
     ("", ""),
-    ("⑥ 如何看每週工時 Summary", ""),
-    ("Summary 頁", "① 每位員工每日/每週時數、工時最多/最少；② 每日覆蓋概況；③ 問題時段清單。"),
+    ("⑦ 如何看每週工時 Summary", ""),
+    ("Summary 頁", "① 每日/每週時數 + 長短週目標達成；② 每日覆蓋概況；③ 問題時段清單。"),
     ("", ""),
-    ("日後可加入的規則", "固定放假日、長短週、兼職每週最低時數、飯鐘規則、分段班次等 (可再請我擴充)。"),
+    ("日後可加入的規則", "固定放假日、兼職每週最低時數細則、飯鐘規則、分段班次、輪替長短週自動排程等 (可再請我擴充)。"),
 ]
 r = 2
 for a, b in lines:
